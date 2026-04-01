@@ -1,0 +1,31 @@
+{
+  "_comment": "WundScan AI — Konfigurationsdatei (Beispiel). Kopieren als config.json und anpassen.",
+  "version": "3.0.0",
+  "apiMode": "demo",
+  "anthropic": {
+    "apiKey": "",
+    "model": "claude-sonnet-4-6",
+    "_note": "ACHTUNG: API-Key NICHT in Git committen. Nur für Entwicklung/Test. Im klinischen Betrieb Ollama verwenden."
+  },
+  "ollama": {
+    "url": "http://localhost:11434",
+    "model": "llava",
+    "alternativeModels": ["llava:13b", "llava:34b", "bakllava", "llava-llama3", "moondream"]
+  },
+  "defaults": {
+    "referenceObject": "euro_1",
+    "evaluationInterval": 14,
+    "sessionTimeoutMinutes": 30
+  },
+  "privacy": {
+    "stripExifData": true,
+    "allowCloudApi": false,
+    "pseudonymRequired": true,
+    "autoDeleteOnTimeout": true
+  },
+  "institution": {
+    "name": "Salzkammergut Klinikum Gmunden",
+    "organization": "OÖG — Oberösterreichische Gesundheitsholding",
+    "department": ""
+  }
+}

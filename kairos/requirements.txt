@@ -1,0 +1,7 @@
+anthropic
+schedule
+python-dotenv
+PyGithub
+python-telegram-bot>=21.0
+requests
+chromadb

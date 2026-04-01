@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WundScan-AI v5.0.0</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+    // === SOFORT-CHECK: file:// erkannt? Redirect versuchen! ===
+    if (window.location.protocol === 'file:') {
+        // Versuche auf localhost umzuleiten (Server laeuft vielleicht schon)
+        var img = new Image();
+        img.onload = function() {
+            window.location.replace('http://localhost:8082');
+        };
+        img.onerror = function() {
+            // Server laeuft nicht - Warnung wird in DOMContentLoaded angezeigt
+            document.addEventListener('DOMContentLoaded', function() {
+                document.getElementById('cors-warning').style.display = 'flex';
+                document.getElementById('app').style.filter = 'blur(4px)';
+                document.getElementById('app').style.pointerEvents = 'none';
+            });
+        };
+        // Teste ob Server erreichbar ist
+        img.src = 'http://localhost:8082/favicon.ico?t=' + Date.now();
+        // Fallback: nach 2 Sekunden Warnung zeigen wenn Redirect nicht klappt
+        setTimeout(function() {
+            if (window.location.protocol === 'file:') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    document.getElementById('cors-warning').style.display = 'flex';
+                    document.getElementById('app').style.filter = 'blur(4px)';
+                    document.getElementById('app').style.pointerEvents = 'none';
+                });
+            }
+        }, 2500);
+    }
+    </script>
+</head>
+<body>
+    <!-- CORS / file:// Warnung -->
+    <div id="cors-warning" class="cors-overlay" style="display:none;">
+        <div class="cors-modal">
+            <div class="cors-icon">
+                <svg viewBox="0 0 48 48" width="64" height="64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="48" height="48" rx="24" fill="#fef3c7"/>
+                    <path d="M24 16v8m0 4h.01M12.9 38h22.2c2.3 0 3.7-2.5 2.5-4.5L25.5 12.5c-1.1-2-4-2-5.1 0L8.4 33.5c-1.1 2 .3 4.5 2.5 4.5z" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <h2>App falsch gestartet</h2>
+            <p>Du hast die HTML-Datei direkt geöffnet.<br>
+            Die App braucht einen lokalen Server um zu funktionieren.</p>
+            <div class="cors-fix">
+                <strong>So geht's richtig:</strong>
+                <ol style="text-align:left;margin:.75rem 0 0 1.25rem;line-height:2;">
+                    <li>Dieses Fenster <strong>schließen</strong></li>
+                    <li>Im WundScan-AI Ordner:</li>
+                    <li>Doppelklick auf <code style="background:#e0f2fe;padding:2px 8px;border-radius:4px;font-size:.95em;">WundScan-AI-Start.bat</code></li>
+                </ol>
+            </div>
+            <div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;">
+                <button onclick="window.location.replace('http://localhost:8082')" class="btn btn-primary">Zu localhost:8082 wechseln</button>
+                <button onclick="document.getElementById('cors-warning').style.display='none';document.getElementById('app').style.filter='';document.getElementById('app').style.pointerEvents='';" class="btn btn-secondary">Trotzdem öffnen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Shell -->
+    <div id="app" class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="32" height="32" rx="8" fill="var(--accent)"/>
+                            <path d="M16 6C10.48 6 6 10.48 6 16s4.48 10 10 10 10-4.48 10-10S21.52 6 16 6zm-1 15h2v-4h4v-2h-4v-4h-2v4h-4v2h4v4z" fill="white"/>
+                        </svg>
+                    </div>
+                    <div class="logo-text">
+                        <span class="logo-title">WundScan-AI</span>
+                        <span class="logo-version">v5.0.0</span>
+                    </div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-section="dashboard" onclick="showSection('dashboard');return false;">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-section="neue-wunde" onclick="showSection('neue-wunde');return false;">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+                    <span>Neue Dokumentation</span>
+                </a>
+                <a href="#" class="nav-item" data-section="verlauf" onclick="showSection('verlauf');return false;">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+                    <span>Wundverlauf</span>
+                </a>
+                <a href="#" class="nav-item" data-section="patienten" onclick="showSection('patienten');return false;">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+                    <span>Patienten</span>
+                </a>
+                <a href="#" class="nav-item" data-section="einstellungen" onclick="showSection('einstellungen');return false;">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+                    <span>Einstellungen</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="server-status" id="server-status">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Server aktiv</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Menu">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+                </button>
+                <h1 class="page-title" id="page-title">Dashboard</h1>
+                <div class="top-bar-actions">
+                    <span class="date-display" id="date-display"></span>
+                </div>
+            </header>
+
+            <!-- Dashboard -->
+            <section id="section-dashboard" class="content-section active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:var(--accent-soft);"><svg viewBox="0 0 20 20" fill="var(--accent)" width="22" height="22"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg></div>
+                        <div class="stat-data"><span class="stat-value" id="stat-patients">0</span><span class="stat-label">Patienten</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:#fef3c7;"><svg viewBox="0 0 20 20" fill="#f59e0b" width="22" height="22"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg></div>
+                        <div class="stat-data"><span class="stat-value" id="stat-wounds">0</span><span class="stat-label">Aktive Wunden</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:#d1fae5;"><svg viewBox="0 0 20 20" fill="#10b981" width="22" height="22"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg></div>
+                        <div class="stat-data"><span class="stat-value" id="stat-healed">0</span><span class="stat-label">Abgeheilt</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background:#ede9fe;"><svg viewBox="0 0 20 20" fill="#8b5cf6" width="22" height="22"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/></svg></div>
+                        <div class="stat-data"><span class="stat-value" id="stat-docs">0</span><span class="stat-label">Dokumentationen</span></div>
+                    </div>
+                </div>
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-header"><h3>Letzte Dokumentationen</h3></div>
+                        <div class="card-body" id="recent-docs">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+                                <p>Noch keine Dokumentationen vorhanden.</p>
+                                <button class="btn btn-primary" onclick="showSection('neue-wunde')">Erste Dokumentation erstellen</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>Schnellstart</h3></div>
+                        <div class="card-body">
+                            <div class="quick-actions">
+                                <button class="quick-action" onclick="showSection('neue-wunde')"><span class="qa-icon">📸</span><span class="qa-text">Neue Wunde<br>dokumentieren</span></button>
+                                <button class="quick-action" onclick="showSection('patienten')"><span class="qa-icon">👤</span><span class="qa-text">Patient<br>anlegen</span></button>
+                                <button class="quick-action" onclick="showSection('verlauf')"><span class="qa-icon">📊</span><span class="qa-text">Wundverlauf<br>ansehen</span></button>
+                                <button class="quick-action" onclick="showSection('einstellungen')"><span class="qa-icon">⚙️</span><span class="qa-text">Einstellungen<br>anpassen</span></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Neue Wunde -->
+            <section id="section-neue-wunde" class="content-section">
+                <div class="card">
+                    <div class="card-header"><h3>Neue Wunddokumentation</h3></div>
+                    <div class="card-body">
+                        <div class="form-grid">
+                            <div class="form-group full-width">
+                                <label for="patient-select">Patient</label>
+                                <select id="patient-select" class="form-control"><option value="">— Patient auswählen —</option></select>
+                                <small>Oder <a href="#" onclick="showSection('patienten');return false;">neuen Patienten anlegen</a></small>
+                            </div>
+                            <div class="form-group">
+                                <label for="wund-art">Wundart</label>
+                                <select id="wund-art" class="form-control">
+                                    <option value="">— Auswählen —</option>
+                                    <option value="dekubitus">Dekubitus</option>
+                                    <option value="ulcus-cruris">Ulcus cruris</option>
+                                    <option value="diabetisches-fusssyndrom">Diabetisches Fußsyndrom</option>
+                                    <option value="postoperativ">Postoperative Wunde</option>
+                                    <option value="traumatisch">Traumatische Wunde</option>
+                                    <option value="verbrennung">Verbrennung</option>
+                                    <option value="sonstige">Sonstige</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="lokalisation">Lokalisation</label>
+                                <select id="lokalisation" class="form-control">
+                                    <option value="">— Auswählen —</option>
+                                    <option value="sacrum">Sacrum / Steißbein</option>
+                                    <option value="ferse-links">Ferse links</option>
+                                    <option value="ferse-rechts">Ferse rechts</option>
+                                    <option value="unterschenkel-links">Unterschenkel links</option>
+                                    <option value="unterschenkel-rechts">Unterschenkel rechts</option>
+                                    <option value="abdomen">Abdomen</option>
+                                    <option value="thorax">Thorax</option>
+                                    <option value="sonstige">Sonstige</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Wundgröße (cm)</label>
+                                <div class="size-inputs">
+                                    <input type="number" id="wund-laenge" class="form-control" placeholder="L" step="0.1" min="0">
+                                    <span class="size-x">×</span>
+                                    <input type="number" id="wund-breite" class="form-control" placeholder="B" step="0.1" min="0">
+                                    <span class="size-x">×</span>
+                                    <input type="number" id="wund-tiefe" class="form-control" placeholder="T" step="0.1" min="0">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Wundgrund</label>
+                                <div class="checkbox-grid">
+                                    <label class="chip"><input type="checkbox" value="granulation"> Granulation</label>
+                                    <label class="chip"><input type="checkbox" value="fibrin"> Fibrin</label>
+                                    <label class="chip"><input type="checkbox" value="nekrose"> Nekrose</label>
+                                    <label class="chip"><input type="checkbox" value="epithel"> Epithel</label>
+                                    <label class="chip"><input type="checkbox" value="biofilm"> Biofilm</label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Exsudat</label>
+                                <div class="dual-select">
+                                    <select id="exsudat-menge" class="form-control"><option value="">Menge</option><option value="kein">Kein</option><option value="gering">Gering</option><option value="maessig">Mäßig</option><option value="stark">Stark</option></select>
+                                    <select id="exsudat-art" class="form-control"><option value="">Art</option><option value="seroes">Serös</option><option value="sanguinolent">Sanguinolent</option><option value="purulent">Purulent</option></select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Wundrand</label>
+                                <div class="checkbox-grid">
+                                    <label class="chip"><input type="checkbox" value="glatt"> Glatt</label>
+                                    <label class="chip"><input type="checkbox" value="unregelmaessig"> Unregelmäßig</label>
+                                    <label class="chip"><input type="checkbox" value="unterminiert"> Unterminiert</label>
+                                    <label class="chip"><input type="checkbox" value="mazeriert"> Mazeriert</label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Infektionszeichen</label>
+                                <div class="checkbox-grid">
+                                    <label class="chip chip-warn"><input type="checkbox" value="roetung"> Rötung</label>
+                                    <label class="chip chip-warn"><input type="checkbox" value="schwellung"> Schwellung</label>
+                                    <label class="chip chip-warn"><input type="checkbox" value="ueberwaermung"> Überwärmung</label>
+                                    <label class="chip chip-warn"><input type="checkbox" value="schmerz"> Schmerz</label>
+                                    <label class="chip chip-warn"><input type="checkbox" value="foetor"> Fötor</label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Schmerz (VAS 0–10)</label>
+                                <div class="range-group">
+                                    <input type="range" id="schmerz-vas" min="0" max="10" value="0" class="form-range" oninput="document.getElementById('schmerz-display').textContent=this.value">
+                                    <span class="range-value" id="schmerz-display">0</span>
+                                </div>
+                            </div>
+                            <div class="form-group full-width">
+                                <label>Wundfoto</label>
+                                <div class="upload-zone" id="upload-zone" onclick="document.getElementById('foto-input').click()">
+                                    <input type="file" id="foto-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoUpload(this)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40"><path d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/><path d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/></svg>
+                                    <p>Foto aufnehmen oder Datei auswählen</p>
+                                </div>
+                                <div id="foto-preview" class="foto-preview" style="display:none;">
+                                    <img id="foto-img" src="" alt="Wundfoto">
+                                    <button class="btn-icon" onclick="removePhoto()" title="Entfernen">✕</button>
+                                </div>
+                            </div>
+                            <div class="form-group full-width">
+                                <label for="bemerkungen">Bemerkungen / Pflegebericht</label>
+                                <textarea id="bemerkungen" class="form-control" rows="4" placeholder="Freitext zur Wundsituation..."></textarea>
+                            </div>
+                            <div class="form-group full-width">
+                                <button class="btn btn-ai" id="btn-ai-analyse" onclick="runAIAnalysis()">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1z"/></svg>
+                                    AI-Analyse starten
+                                </button>
+                            </div>
+                            <div class="form-group full-width" id="ai-result-container" style="display:none;">
+                                <div class="ai-result" id="ai-result"></div>
+                            </div>
+                            <div class="form-actions full-width">
+                                <button class="btn btn-secondary" onclick="resetWoundForm()">Zurücksetzen</button>
+                                <button class="btn btn-primary" onclick="saveWoundDoc()">Dokumentation speichern</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Verlauf -->
+            <section id="section-verlauf" class="content-section">
+                <div class="card">
+                    <div class="card-header"><h3>Wundverlauf</h3></div>
+                    <div class="card-body" id="verlauf-content">
+                        <div class="empty-state"><p>Noch kein Wundverlauf dokumentiert.</p></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Patienten -->
+            <section id="section-patienten" class="content-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Patienten verwalten</h3>
+                        <button class="btn btn-primary btn-sm" onclick="showPatientModal()">+ Neuer Patient</button>
+                    </div>
+                    <div class="card-body" id="patienten-list">
+                        <div class="empty-state">
+                            <p>Noch keine Patienten angelegt.</p>
+                            <button class="btn btn-primary" onclick="showPatientModal()">Ersten Patienten anlegen</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Einstellungen -->
+            <section id="section-einstellungen" class="content-section">
+                <div class="card">
+                    <div class="card-header"><h3>Einstellungen</h3></div>
+                    <div class="card-body">
+                        <!-- AI Konfiguration -->
+                        <h4 style="margin-bottom:.75rem;font-size:.95rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;">AI-Konfiguration</h4>
+                        <div class="settings-grid" style="margin-bottom:1.5rem;">
+                            <div class="setting-item">
+                                <div class="setting-info" style="flex:1;">
+                                    <strong>AI-Backend</strong>
+                                    <small>Modell für die Wundanalyse</small>
+                                </div>
+                                <select id="ai-backend" class="form-control form-control-sm" style="width:200px;" onchange="onAIBackendChange()">
+                                    <option value="anthropic">Anthropic Claude</option>
+                                    <option value="ollama">Lokal (Ollama)</option>
+                                    <option value="none">Ohne AI (nur Formular)</option>
+                                </select>
+                            </div>
+                            <div class="setting-item" id="setting-anthropic-key">
+                                <div class="setting-info" style="flex:1;">
+                                    <strong>Anthropic API Key</strong>
+                                    <small>Dein Claude API Key von <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent);">console.anthropic.com</a></small>
+                                </div>
+                                <div style="display:flex;gap:.5rem;align-items:center;">
+                                    <input type="password" id="anthropic-api-key" class="form-control form-control-sm" style="width:280px;font-family:var(--font-mono);font-size:.82rem;" placeholder="sk-ant-api03-..." oninput="saveAISettings()">
+                                    <button class="btn btn-secondary btn-sm" onclick="toggleKeyVisibility()" title="Key anzeigen/verstecken" style="padding:.4rem .55rem;">👁</button>
+                                    <button class="btn btn-secondary btn-sm" onclick="testAnthropicKey()" title="Verbindung testen">Test</button>
+                                </div>
+                            </div>
+                            <div class="setting-item" id="setting-anthropic-model">
+                                <div class="setting-info" style="flex:1;">
+                                    <strong>Claude Modell</strong>
+                                    <small>Welches Claude-Modell für Analysen</small>
+                                </div>
+                                <select id="anthropic-model" class="form-control form-control-sm" style="width:200px;" onchange="saveAISettings()">
+                                    <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                                    <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+                                    <option value="claude-opus-4-6">Claude Opus 4.6</option>
+                                </select>
+                            </div>
+                            <div class="setting-item" id="setting-ollama-url" style="display:none;">
+                                <div class="setting-info" style="flex:1;">
+                                    <strong>Ollama URL</strong>
+                                    <small>Adresse deines lokalen Ollama-Servers</small>
+                                </div>
+                                <div style="display:flex;gap:.5rem;align-items:center;">
+                                    <input type="text" id="ollama-url" class="form-control form-control-sm" style="width:280px;font-family:var(--font-mono);font-size:.82rem;" placeholder="http://localhost:11434" value="http://localhost:11434" oninput="saveAISettings()">
+                                    <button class="btn btn-secondary btn-sm" onclick="testOllamaConnection()">Test</button>
+                                </div>
+                            </div>
+                            <div class="setting-item" id="setting-ollama-model" style="display:none;">
+                                <div class="setting-info" style="flex:1;">
+                                    <strong>Ollama Modell</strong>
+                                    <small>z.B. llava, llama3, medllama2</small>
+                                </div>
+                                <input type="text" id="ollama-model" class="form-control form-control-sm" style="width:200px;font-family:var(--font-mono);font-size:.85rem;" placeholder="llava:latest" value="llava:latest" oninput="saveAISettings()">
+                            </div>
+                            <div id="ai-status-msg" style="display:none;padding:.6rem 1rem;border-radius:var(--radius-sm);font-size:.85rem;margin-top:.25rem;"></div>
+                        </div>
+
+                        <!-- Allgemeine Einstellungen -->
+                        <h4 style="margin-bottom:.75rem;font-size:.95rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;">Allgemein</h4>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <div class="setting-info"><strong>Dunkelmodus</strong><small>Zwischen hellem und dunklem Design wechseln</small></div>
+                                <label class="toggle"><input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkMode()"><span class="toggle-slider"></span></label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info"><strong>Daten exportieren</strong><small>Alle Daten als JSON sichern</small></div>
+                                <button class="btn btn-secondary btn-sm" onclick="exportData()">Export</button>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info"><strong>Daten importieren</strong><small>Gesicherte Daten wiederherstellen</small></div>
+                                <button class="btn btn-secondary btn-sm" onclick="importData()">Import</button>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info"><strong>Server-Status</strong><small id="server-info-text">...</small></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Patient Modal -->
+    <div class="modal-overlay" id="patient-modal" style="display:none;">
+        <div class="modal">
+            <div class="modal-header"><h3>Neuer Patient</h3><button class="btn-icon" onclick="hidePatientModal()">✕</button></div>
+            <div class="modal-body">
+                <div class="form-group"><label>Nachname</label><input type="text" id="pat-nachname" class="form-control" placeholder="Nachname"></div>
+                <div class="form-group"><label>Vorname</label><input type="text" id="pat-vorname" class="form-control" placeholder="Vorname"></div>
+                <div class="form-group"><label>Geburtsdatum</label><input type="date" id="pat-gebdatum" class="form-control"></div>
+                <div class="form-group"><label>Station</label><input type="text" id="pat-station" class="form-control" placeholder="z.B. Station 3A"></div>
+                <div class="form-group"><label>Zimmer</label><input type="text" id="pat-zimmer" class="form-control" placeholder="z.B. 312/1"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="hidePatientModal()">Abbrechen</button>
+                <button class="btn btn-primary" onclick="savePatient()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+    <script src="js/app.js"></script>
+</body>
+</html>

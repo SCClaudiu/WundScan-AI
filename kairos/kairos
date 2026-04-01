@@ -1,0 +1,60 @@
+#!/bin/bash
+# Kairos Daemon Control Script
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DAEMON_SCRIPT="kairos_daemon_final.py"
+LOG_FILE="kairos_logs.txt"
+PID_FILE="kairos.pid"
+
+cd "$SCRIPT_DIR" || exit 1
+
+case "$1" in
+    start)
+        if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+            echo "Kairos läuft bereits (PID: $(cat $PID_FILE))"
+            exit 0
+        fi
+        echo "🚀 Starte Kairos Daemon..."
+        nohup python "$DAEMON_SCRIPT" >> "$LOG_FILE" 2>&1 &
+        echo $! > "$PID_FILE"
+        echo "✅ Kairos gestartet (PID: $(cat $PID_FILE))"
+        echo "   Logs: tail -f $LOG_FILE"
+        ;;
+
+    stop)
+        if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+            echo "🛑 Stoppe Kairos..."
+            kill "$(cat "$PID_FILE")" 2>/dev/null
+            rm -f "$PID_FILE"
+            echo "✅ Kairos gestoppt"
+        else
+            echo "Kairos läuft nicht."
+        fi
+        ;;
+
+    restart)
+        echo "🔄 Neustart Kairos..."
+        $0 stop
+        sleep 2
+        $0 start
+        ;;
+
+    status)
+        if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+            echo "✅ Kairos läuft (PID: $(cat $PID_FILE))"
+            echo "Letzte 15 Zeilen Logs:"
+            tail -n 15 "$LOG_FILE"
+        else
+            echo "❌ Kairos ist gestoppt."
+        fi
+        ;;
+
+    logs)
+        tail -f "$LOG_FILE"
+        ;;
+
+    *)
+        echo "Usage: ./kairos {start|stop|restart|status|logs}"
+        exit 1
+        ;;
+esac

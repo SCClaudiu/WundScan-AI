@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m venv venv)",
+      "Bash(source venv/Scripts/activate)",
+      "Bash(pip install:*)",
+      "Bash(python -c \":*)",
+      "Bash(timeout 10 streamlit run app.py --server.headless true --server.port 8501)",
+      "Bash(chmod +x kairos)",
+      "Bash(cp .env.template .env)",
+      "Bash(./kairos start:*)",
+      "Bash(./kairos restart:*)",
+      "Bash(./kairos status:*)",
+      "Bash(python3 kairos_daemon_final.py)",
+      "Bash(where python:*)",
+      "Bash(py --version)",
+      "Bash(python -c \"import anthropic; import schedule; import chromadb; from github import Github; print\\(''Alle Imports OK''\\)\")",
+      "Bash(python -c \"from pathlib import Path; from dotenv import load_dotenv; import os; load_dotenv\\(Path\\(''.env''\\)\\); print\\(''KEY:'', repr\\(os.getenv\\(''ANTHROPIC_API_KEY'',''MISSING''\\)[:20]\\)\\)\")",
+      "Bash(./kairos stop:*)",
+      "Bash(rm -f kairos_logs.txt)"
+    ]
+  }
+}

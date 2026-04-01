@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WundScan AI v5.0.0 — Pflegerisches Wunddokumentationssystem</title>
+  <meta name="description" content="KI-gestütztes Wunddokumentationssystem für Pflegefachkräfte mit Nursing-Fokus und AMBOSS-Integration.">
+
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩺</text></svg>">
+
+  <!-- React -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+
+  <!-- Babel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js" crossorigin></script>
+
+  <!-- PropTypes -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js" crossorigin></script>
+
+  <!-- Recharts -->
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js" crossorigin></script>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js" crossorigin></script>
+
+  <style>
+    #loading-screen {
+      position: fixed; inset: 0; z-index: 9999;
+      background: linear-gradient(135deg, #1e6bb8 0%, #134d85 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: white; font-family: 'Segoe UI', system-ui, sans-serif;
+      transition: opacity 0.5s;
+    }
+    #loading-screen.fade { opacity: 0; pointer-events: none; }
+    #loading-screen .spinner {
+      width: 48px; height: 48px;
+      border: 4px solid rgba(255,255,255,0.3);
+      border-top-color: white; border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background-color: #f8f9fa;
+    }
+    .wound-phase-badge {
+      display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;
+      font-weight: 600; white-space: nowrap;
+    }
+    .phase-reinigung { background-color: #fee2e2; color: #991b1b; }
+    .phase-fibrinabbau { background-color: #fed7aa; color: #92400e; }
+    .phase-granulation { background-color: #dcfce7; color: #166534; }
+    .phase-epithelisierung { background-color: #dbeafe; color: #0c2d6b; }
+    .phase-gemischt { background-color: #f3e8ff; color: #581c87; }
+    .tab-button {
+      padding: 12px 16px; border: none; background: none;
+      cursor: pointer; font-weight: 500; font-size: 0.9rem;
+      border-bottom: 3px solid transparent; transition: all 0.3s;
+      color: #666;
+    }
+    .tab-button.active {
+      color: #1e6bb8; border-bottom-color: #1e6bb8;
+    }
+    .tab-button:hover:not(.active) {
+      color: #333; border-bottom-color: #ddd;
+    }
+    .source-warning {
+      background-color: #fef3c7; border-left: 4px solid #f59e0b;
+      padding: 12px; border-radius: 4px; font-size: 0.875rem;
+      color: #92400e;
+    }
+    .red-flag-item {
+      padding: 8px; border-left: 3px solid #dc2626;
+      background-color: #fee2e2; margin-bottom: 8px; border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <!-- CORS-Warnung bei file:// Zugriff -->
+  <div id="cors-file-warning" style="display:none; background:#fef3c7; border-bottom:3px solid #f59e0b; padding:14px 20px; font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; color:#92400e; text-align:center; position:relative; z-index:10000;">
+    <strong>⚠️ CORS-Problem erkannt:</strong> Die App wurde direkt als Datei geöffnet — der Browser blockiert daher alle API-Aufrufe.<br>
+    <span style="font-size:14px;">👉 <strong>Lösung:</strong> Bitte starte die App über <code style="background:#fde68a;padding:2px 6px;border-radius:4px;">WundScan-AI-Start.bat</code> (Doppelklick) statt die HTML-Datei direkt zu öffnen.</span>
+  </div>
+  <script>
+    if (window.location.protocol === "file:") {
+      document.getElementById("cors-file-warning").style.display = "block";
+    }
+  </script>
+
+  <div id="loading-screen">
+    <div class="spinner"></div>
+    <p style="margin-top: 20px; text-center;">WundScan AI v5.0.0 wird geladen...</p>
+  </div>
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
+
+    const APP_VERSION = "5.0.0";
+
+    const WOUND_PHASES = ["Reinigungsphase", "Fibrinabbauphase", "Granulationsphase", "Epithelisierungsphase", "Gemischte Phase"];
+    const TISSUE_TYPES = { granulation: "Granulationsgewebe", epithelgewebe: "Epithelgewebe", fibrin: "Fibrin/Nekrose", nekrose: "Nekrose", sonstiges: "Sonstiges" };
+    const EXUDATE_AMOUNTS = ["gering", "moderat", "verstärkt"];
+    const EXUDATE_TYPES = ["serös", "seropurulent", "purulent", "hämato"];
+    const EXUDATE_SMELLS = ["keiner", "schwach", "intensiv"];
+    const REFERENCE_OBJECTS = {
+      muenze_1euro: { label: "1-Euro-Münze (24mm)", diameter_mm: 24 },
+      muenze_50cent: { label: "50-Cent-Münze (24mm)", diameter_mm: 24 },
+      cent_1cent: { label: "1-Cent-Münze (16.25mm)", diameter_mm: 16.25 },
+      wattestab: { label: "Wattestab (Spitze ca. 3mm)", diameter_mm: 3 },
+      fingernagel: { label: "Fingernagel (~17x10mm)", width_mm: 17 }
+    };
+
+    const NURSING_SYSTEM_PROMPT = `Du bist ein erfahrener pflegerischer Wund-Assessment-Experte für österreichische Krankenhäuser (OÖG). Deine Aufgabe ist ausschließlich die pflegerische Einschätzung, Beobachtung und Dokumentation von Wunden.
+
+STRENGE REGELN:
+1. PFLEGERISCHE SPRACHE: Verwende ausschließlich pflegerische Begriffe — "beobachtet", "dokumentiert", "eingeschätzt", "pflegerisch beurteilt". KEINE ärztlichen Diagnosen, KEINE Therapieanordnungen.
+2. QUELLENPFLICHT: Jede fachliche Aussage MUSS mit einer konkreten Quelle belegt werden. Ohne Quellenangabe ist keine Aussage für die klinische Verwendung freigegeben.
+3. KEINE PAUSCHALEN AUSSAGEN: Formuliere NIEMALS "täglich Verbandwechsel", "Duschen erlaubt" oder ähnliche pauschale Empfehlungen. Stattdessen IMMER: "gemäß Wundplan", "gemäß hausinternem Standard", "gemäß ärztlicher Anordnung", "abhängig von Wundart, Verbandmaterial und klinischer Freigabe".
+4. DIFFERENZIERTE FORMULIERUNG: Jede Maßnahme und Empfehlung muss qualifiziert sein — mit Bedingung, Einschränkung oder Verweis auf die zuständige Anordnung.
+5. WISSENSBASIS: Pflegerische Inhalte beruhen auf AMBOSS Pflegewissen (insb. Wundversorgung, Verbandswechsel, chronische Wunden), lokalen OÖG-Standards und validierten internen Vorgaben (SOPs).
+6. ZWEI GETRENNTE AUSGABEN: Erstelle immer (A) einen klinischen Output für Pflege/ORBIS und (B) eine Patient:inneninformation in einfacher Sprache.
+7. RED FLAGS: Benenne immer klar die Warnzeichen, bei denen sofort die behandelnde Stelle kontaktiert werden muss.
+8. MATERIALVERSORGUNG: Gib immer konkret an, welche Materialien benötigt werden, in welcher Menge, mit welchem Wechselintervall (qualifiziert!) und woher sie bezogen werden können.
+
+Antworte AUSSCHLIESSLICH mit einem JSON-Objekt (kein Markdown, kein Text davor/danach). Das JSON MUSS exakt diese Struktur haben:
+
+{
+  "klinischer_output": {
+    "strukturierte_wundbeschreibung": "Detaillierte pflegerische Beschreibung der Wunde basierend auf Bild und Angaben — Lokalisation, Größe, Wundgrund, Wundrand, Wundumgebung, Exsudat...",
+    "pflegerische_einschaetzung": "Pflegerische Beurteilung der Wundsituation, Heilungsphase, Verlaufstendenz. KEINE ärztliche Diagnose.",
+    "beobachtungsparameter": ["Parameter 1 — was genau beobachtet werden soll", "Parameter 2", "Parameter 3"],
+    "pflegerische_massnahmen": ["Maßnahme 1 — gemäß [Quelle] (qualifiziert)", "Maßnahme 2 — gemäß [Quelle]"],
+    "evaluationskriterien": ["Kriterium 1 — woran Fortschritt/Verschlechterung erkannt wird", "Kriterium 2"],
+    "eskalationshinweise": "Konkrete Beschreibung, WANN ärztliche Einschätzung eingeholt werden muss — mit Bezug auf beobachtbare Zeichen."
+  },
+  "patienteninformation": {
+    "was_wurde_gemacht": "Einfache Erklärung, was bei der Wundversorgung gemacht wurde.",
+    "zu_hause_machen": "Was Patient:in zu Hause beachten muss — ohne pauschale Aussagen.",
+    "verbandwechsel_intervall": "NUR wenn dokumentiert vorgegeben. Sonst: 'Gemäß Wundplan / ärztlicher Anordnung. Bitte bei Entlassung erfragen.'",
+    "materialien_benoetigt": "Welche Materialien benötigt werden — konkret und verständlich.",
+    "materialien_bezug": "Wo Patient:in die Materialien bekommt: Station, Ambulanz, Apotheke, Sanitätshaus, Hauskrankenpflege, per Rezept/Verordnung.",
+    "duschen_erlaubt": "NIEMALS pauschal 'ja' oder 'nein'. Immer: 'Gemäß Wundplan / hausinternem Standard / ärztlicher Anordnung. Abhängig von Wundart, Verbandmaterial und klinischer Freigabe.'",
+    "zu_vermeiden": ["Was vermieden werden soll — konkret und begründet"],
+    "worauf_achten": ["Worauf Patient:in achten soll — konkret"],
+    "red_flags": ["Zunehmende Schmerzen", "Zunehmende Rötung oder Schwellung", "Übler Geruch aus der Wunde", "Eiter oder auffälliges Sekret", "Fieber oder Verschlechterung des Allgemeinzustands", "Schnelle Vergrößerung der Wunde", "Dunkle oder schwarze Verfärbung"],
+    "ansprechperson": "Wer Ansprechperson ist und wohin sich Patient:in bei Problemen melden soll"
+  },
+  "materialversorgung": {
+    "benoetigt": [
+      {"name": "Materialname", "menge": "Stückzahl/Packung", "intervall": "Wechselintervall gemäß Wundplan", "quelle": "Bezugsquelle (Station/Ambulanz/Apotheke/Sanitätshaus/Rezept)"}
+    ]
+  },
+  "quellen": [
+    {"quelle": "Quellenname (z.B. AMBOSS, Lokaler Standard OÖG, SOP Wundmanagement)", "titel": "Dokumenttitel", "stand": "Datum oder Jahr der Quelle", "abrufdatum": "Heutiges Datum", "begruendung": "Warum diese Quelle zur beobachteten Wundsituation passt"}
+  ]
+}
+
+WICHTIG: Alle Felder MÜSSEN ausgefüllt sein (nicht leer). Jedes Array MUSS mindestens einen Eintrag haben. Jede pflegerische Maßnahme MUSS eine Quellenangabe enthalten.`;
+
+    function validateAssessment(data) {
+      if (!data || typeof data !== "object") return null;
+      const defaults = {
+        wundphase: "Gemischte Phase",
+        gewebetypen: { granulation: 25, epithelgewebe: 25, fibrin: 25, nekrose: 0, sonstiges: 25 },
+        exsudat: { menge: "gering", art: "serös", farbe: "", geruch: "keiner" },
+        wundrand: { zustand: "intakt", beschreibung: "Nicht beurteilbar" },
+        wundumgebung: { zustand: "intakt", beschreibung: "Nicht beurteilbar" },
+        infektionszeichen: { vorhanden: false, zeichen: [], schweregrad: "keine" },
+        groessenschaetzung: { laenge_cm: null, breite_cm: null, tiefe_cm: null },
+        dfs_klassifikation: { verdacht_auf_dfs: false },
+        schmerz: { pieks_test_empfehlung: false, hinweis: "Schmerzassessment empfohlen" },
+        klinischer_output: { strukturierte_wundbeschreibung: "", pflegerische_einschaetzung: "", beobachtungsparameter: [], pflegerische_massnahmen: [], evaluationskriterien: [], eskalationshinweise: "" },
+        patienteninformation: { was_wurde_gemacht: "", zu_hause_machen: "", verbandwechsel_intervall: "", materialien_benoetigt: "", materialien_bezug: "", duschen_erlaubt: "", zu_vermeiden: [], worauf_achten: [], red_flags: [], ansprechperson: "" },
+        materialversorgung: { benoetigt: [] },
+        quellen: [],
+        timestamp: new Date().toISOString()
+      };
+      return { ...defaults, ...data };
+    }
+
+    // === Hilfsfunktion: CORS-Warnung bei file:// ===
+    function checkFileProtocolWarning() {
+      if (window.location.protocol === "file:") {
+        return "CORS-Problem: Die App wird über file:// geöffnet — der Browser blockiert alle API-Zugriffe. Bitte starte die App über WundScan-AI-Start.bat (Doppelklick) statt die HTML-Datei direkt zu öffnen.";
+      }
+      return null;
+    }
+
+    // === Hilfsfunktion: Bild komprimieren (max 4MB Base64) ===
+    async function compressImageIfNeeded(dataUrl, maxSizeKB = 4000) {
+      if (!dataUrl || typeof dataUrl !== "string") return dataUrl;
+      // Prüfe aktuelle Größe
+      const base64Data = dataUrl.replace(/^data:image\/[^;]+;base64,/, "");
+      const sizeKB = Math.ceil((base64Data.length * 3) / 4 / 1024);
+      if (sizeKB <= maxSizeKB) return dataUrl;
+
+      console.log(`Bild zu groß (${sizeKB}KB), komprimiere auf max ${maxSizeKB}KB...`);
+
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          let quality = 0.85;
+          let maxDim = 2048;
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+
+          const tryCompress = () => {
+            let w = img.width, h = img.height;
+            if (w > maxDim || h > maxDim) {
+              const ratio = Math.min(maxDim / w, maxDim / h);
+              w = Math.round(w * ratio);
+              h = Math.round(h * ratio);
+            }
+            canvas.width = w;
+            canvas.height = h;
+            ctx.drawImage(img, 0, 0, w, h);
+            const compressed = canvas.toDataURL("image/jpeg", quality);
+            const compressedB64 = compressed.replace(/^data:image\/[^;]+;base64,/, "");
+            const newSizeKB = Math.ceil((compressedB64.length * 3) / 4 / 1024);
+
+            if (newSizeKB <= maxSizeKB || quality <= 0.3) {
+              console.log(`Bild komprimiert: ${sizeKB}KB → ${newSizeKB}KB (quality=${quality}, ${w}x${h})`);
+              resolve(compressed);
+            } else {
+              quality -= 0.1;
+              if (quality <= 0.3) maxDim = Math.round(maxDim * 0.75);
+              tryCompress();
+            }
+          };
+          tryCompress();
+        };
+        img.onerror = () => {
+          console.warn("Bild-Komprimierung fehlgeschlagen, verwende Original");
+          resolve(dataUrl);
+        };
+        img.src = dataUrl;
+      });
+    }
+
+    // === Hilfsfunktion: Bildgröße in KB berechnen ===
+    function getBase64SizeKB(dataUrl) {
+      if (!dataUrl) return 0;
+      const base64Data = dataUrl.replace(/^data:image\/[^;]+;base64,/, "");
+      return Math.ceil((base64Data.length * 3) / 4 / 1024);
+    }
+
+    // === Hilfsfunktion: Bild-Medientyp aus Data-URL erkennen ===
+    function detectImageMediaType(dataUrl, fileType) {
+      // Priority 1: Explicit file type from File object
+      if (fileType && fileType.startsWith("image/")) return fileType;
+      // Priority 2: Data URL header
+      if (dataUrl && typeof dataUrl === "string") {
+        const match = dataUrl.match(/^data:(image\/[^;]+);base64,/);
+        if (match && match[1]) return match[1];
+      }
+      // Priority 3: Magic bytes fallback
+      if (dataUrl && typeof dataUrl === "string") {
+        const b64 = dataUrl.replace(/^data:image\/[^;]+;base64,/, "").substring(0, 16);
+        try {
+          const bytes = atob(b64);
+          if (bytes.charCodeAt(0) === 0x89 && bytes.charCodeAt(1) === 0x50) return "image/png";
+          if (bytes.charCodeAt(0) === 0xFF && bytes.charCodeAt(1) === 0xD8) return "image/jpeg";
+          if (bytes.substring(0, 4) === "RIFF" && bytes.substring(8, 12) === "WEBP") return "image/webp";
+          if (bytes.substring(0, 3) === "GIF") return "image/gif";
+        } catch (e) {}
+      }
+      return "image/jpeg";
+    }
+
+    // === Hilfsfunktion: Ollama-Verbindung testen ===
+    async function testOllamaConnection(url) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        const resp = await fetch(`${url}/api/tags`, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (!resp.ok) return { ok: false, error: `Server antwortet mit Status ${resp.status}` };
+        const data = await resp.json();
+        const models = (data.models || []).map(m => m.name || m.model || "");
+        const hasLlava = models.some(m => m.toLowerCase().includes("llava"));
+        return { ok: true, models, hasLlava };
+      } catch (e) {
+        if (e.name === "AbortError") return { ok: false, error: "Zeitüberschreitung (5s). Ist Ollama gestartet?" };
+        return { ok: false, error: `Verbindung fehlgeschlagen: ${e.message}. Starte Ollama mit: ollama serve` };
+      }
+    }
+
+    // === Hilfsfunktion: Anthropic API-Key prüfen ===
+    async function testAnthropicKey(apiKey) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        const resp = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true"
+          },
+          body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 10, messages: [{ role: "user", content: "test" }] }),
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        if (resp.status === 401) return { ok: false, error: "API-Key ungültig oder abgelaufen." };
+        if (resp.status === 403) return { ok: false, error: "Zugriff verweigert. Prüfe API-Key-Berechtigungen." };
+        if (resp.status === 429) return { ok: true, warning: "Rate-Limit erreicht. Bitte kurz warten." };
+        if (resp.ok) return { ok: true };
+        return { ok: false, error: `API antwortet mit Status ${resp.status}` };
+      } catch (e) {
+        if (e.name === "AbortError") return { ok: false, error: "Zeitüberschreitung. Prüfe Internetverbindung." };
+        return { ok: false, error: `Verbindungsfehler: ${e.message}` };
+      }
+    }
+
+    const DEMO_ASSESSMENT = {
+      id: "demo-" + Date.now(),
+      patientId: "DEMO001",
+      patientName: "Muster-Patient:in",
+      wundbeschreibung: "Wunde an der Ferse, chronisches Ulkus",
+      image: null,
+      timestamp: new Date().toISOString(),
+      wundphase: "Granulationsphase",
+      gewebetypen: { granulation: 70, epithelgewebe: 15, fibrin: 5, nekrose: 0, sonstiges: 10 },
+      exsudat: { menge: "moderat", art: "serös", farbe: "klar", geruch: "keiner" },
+      wundrand: { zustand: "intakt", beschreibung: "Rand leicht erhaben, Farbe rosa" },
+      wundumgebung: { zustand: "intakt", beschreibung: "Haut trocken, keine Ödemzeichen" },
+      infektionszeichen: { vorhanden: false, zeichen: [], schweregrad: "keine" },
+      groessenschaetzung: { laenge_cm: 3.5, breite_cm: 2.2, tiefe_cm: 0.8 },
+      dfs_klassifikation: { verdacht_auf_dfs: false },
+      schmerz: { pieks_test_empfehlung: false, hinweis: "Patient:in berichtet leichte Schmerzen bei Manipulation" },
+      klinischer_output: {
+        strukturierte_wundbeschreibung: "Chronische Wunde an der Ferse mit Granulationsgewebe (70%), vereinzeltem Epithelgewebe (15%) und geringem Fibrinbelag (5%). Wundrand intakt, leicht erhaben, rosa Färbung. Wundumgebung trocken ohne Ödemzeichen. Exsudat moderat, serös, klar, geruchlos.",
+        pflegerische_einschaetzung: "Wunde befindet sich in der Granulationsphase. Heilungsverlauf planmäßig. Infektionszeichen nicht sichtbar. Wundrand und -umgebung intakt. Schmerzmanagement sollte evaluiert werden.",
+        beobachtungsparameter: ["Größe der Wunde", "Exsudatmenge und -art", "Gewebetypen", "Wundrand-/umgebung", "Infektionszeichen", "Schmerzintensität"],
+        pflegerische_massnahmen: ["Regelmäßige Inspektion gemäß Wundplan (Quelle: Lokaler Standard OÖG)", "Steriler Verbandwechsel gemäß Wundplan / ärztlicher Anordnung (Quelle: AMBOSS – Verbandswechsel)", "Wundreinigung mit Actimaris sensitiv gemäß Wundplan (Quelle: Lokaler Standard OÖG)", "Druckentlastung Ferse gemäß Wundplan (Quelle: Pflegestandard Druckentlastungsmaßnahmen)", "Schmerzmanagement gemäß ärztlicher Anordnung", "Dokumentation gemäß ORBIS und Hausstandard"],
+        evaluationskriterien: ["Reduktion Wundgröße", "Zunahme Epithelgewebe", "Abnahme Fibrinbelag", "Stabiler Wundrand", "Konstante Exsudatmenge", "Keine Infektionszeichen"],
+        eskalationshinweise: "Bei Wundgrößenzunahme, verstärktem Exsudat oder Infektionszeichen umgehend ärztliche Einschätzung einholen."
+      },
+      patienteninformation: {
+        was_wurde_gemacht: "Ihre Wunde an der Ferse wurde untersucht und dokumentiert.",
+        zu_hause_machen: "Verbandwechsel gemäß Anleitung durchführen. Wunde sauber und trocken halten.",
+        verbandwechsel_intervall: "Gemäß Wundplan / ärztlicher Anordnung. Aktuell dokumentiert: alle 2–3 Tage oder früher bei Durchfeuchtung.",
+        materialien_benoetigt: "Sterile Kompressen, Wundauflage (Alginat), Spülmittel, Mullkompressen, Druckentlastungs-Pad",
+        materialien_bezug: "Station / Ambulanz oder per Rezept in Apotheke",
+        duschen_erlaubt: "Gemäß Wundplan / hausinternem Standard / ärztlicher Anordnung. Abhängig von Wundart, Verbandmaterial und klinischer Freigabe. Bitte bei Entlassung individuell erfragen.",
+        zu_vermeiden: ["Druck auf Ferse", "Feuchtigkeit um Wunde", "Unsaubere Wechsel", "Häufiges Abheben", "Eigenständige Maßnahmen"],
+        worauf_achten: ["Tägliche Wundkontrolle", "Feuchtigkeit prüfen", "Schmerzen dokumentieren", "Druckentlastung beachten", "Richtige Wechseltechnik"],
+        red_flags: ["Zunehmende Schmerzen", "Zunehmende Rötung/Schwellung", "Übler Geruch", "Eiter/auffälliges Sekret", "Fieber", "Schnelle Vergrößerung", "Dunkle Färbung"],
+        ansprechperson: "[Name Pflegeteam / Station]. Notfall: Rettungsdienst bei Fieber/Verschlechterung."
+      },
+      materialversorgung: {
+        benoetigt: [
+          { name: "Sterile Kompressen 10x10cm", menge: "10 Stück", intervall: "gemäß Wundplan (je nach Exsudat)", quelle: "Station" },
+          { name: "Alginat-Wundauflage", menge: "5 Stück", intervall: "gemäß Wundplan (je nach Exsudat)", quelle: "Apotheke / Sanitätshaus / Rezept" },
+          { name: "Actimaris sensitiv", menge: "1 Flasche", intervall: "gemäß Wundplan", quelle: "Station" },
+          { name: "Mullkompressen", menge: "10 Stück", intervall: "gemäß Wundplan (je nach Exsudat)", quelle: "Station" }
+        ]
+      },
+      quellen: [
+        { quelle: "AMBOSS", titel: "Chronische Wunden und Wundbehandlung", stand: "27.01.2026", abrufdatum: "21.03.2026", begruendung: "Wundphase-Beurteilung nach pflegerischen Standards" },
+        { quelle: "Lokaler Standard", titel: "Wunddokumentation und -management", stand: "2025", abrufdatum: "21.03.2026", begruendung: "Materialempfehlungen, Verbandwechsel-Intervalle" },
+        { quelle: "Pflegestandard", titel: "Druckentlastungsmaßnahmen", stand: "2024", abrufdatum: "21.03.2026", begruendung: "Spezifische Empfehlung für Fersengeschwüre" }
+      ]
+    };
+
+    function Card({ children, className = "" }) {
+      return <div className={`bg-white rounded-xl border border-gray-200 shadow-sm ${className}`}>{children}</div>;
+    }
+
+    function Button({ children, onClick, variant = "primary", size = "md", disabled = false, className = "" }) {
+      const sizes = { sm: "px-3 py-1.5 text-sm", md: "px-4 py-2 text-sm", lg: "px-6 py-3 text-base" };
+      const variants = { primary: "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300", secondary: "bg-gray-200 text-gray-700 hover:bg-gray-300", danger: "bg-red-600 text-white hover:bg-red-700", outline: "border border-gray-300 text-gray-700 hover:bg-gray-50" };
+      const base = "rounded-lg font-medium transition-all flex items-center gap-2 justify-center";
+      return <button onClick={onClick} disabled={disabled} className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}>{children}</button>;
+    }
+
+    function AssessmentForm({ onSubmit, loading }) {
+      const [patientId, setPatientId] = useState("");
+      const [patientName, setPatientName] = useState("");
+      const [wundbeschreibung, setWundbeschreibung] = useState("");
+      const [image, setImage] = useState(null);
+      const [imageFileType, setImageFileType] = useState(null);
+      const [wundphase, setWundphase] = useState("Gemischte Phase");
+      const [gewebetypen, setGewebetypen] = useState({ granulation: 25, epithelgewebe: 25, fibrin: 25, nekrose: 0, sonstiges: 25 });
+      const [exsudat, setExsudat] = useState({ menge: "gering", art: "serös", farbe: "", geruch: "keiner" });
+      const [wundrand, setWundrand] = useState({ zustand: "intakt", beschreibung: "" });
+      const [wundumgebung, setWundumgebung] = useState({ zustand: "intakt", beschreibung: "" });
+      const [infektionszeichen, setInfektionszeichen] = useState({ vorhanden: false, zeichen: [], schweregrad: "keine" });
+      const [groessenschaetzung, setGroessenschaetzung] = useState({ laenge_cm: "", breite_cm: "", tiefe_cm: "" });
+      const [dfsVerdacht, setDfsVerdacht] = useState(false);
+
+      const handleImageUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          setImageFileType(file.type || null);
+          const reader = new FileReader();
+          reader.onload = (evt) => setImage(evt.target?.result);
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const handleGewebeChange = (typ, value) => {
+        const updated = { ...gewebetypen, [typ]: parseInt(value) || 0 };
+        const sum = Object.values(updated).reduce((a, b) => a + b, 0);
+        if (sum <= 100) setGewebetypen(updated);
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const gewebeSum = Object.values(gewebetypen).reduce((a, b) => a + b, 0);
+        if (gewebeSum !== 100) {
+          alert("Die Summe der Gewebetypen muss exakt 100% ergeben. Aktuell: " + gewebeSum + "%");
+          return;
+        }
+        onSubmit({
+          patientId: patientId || "ANONYM",
+          patientName: patientName || "Patient:in ohne Name",
+          wundbeschreibung,
+          image,
+          imageFileType,
+          wundphase,
+          gewebetypen,
+          exsudat,
+          wundrand,
+          wundumgebung,
+          infektionszeichen,
+          groessenschaetzung: {
+            laenge_cm: groessenschaetzung.laenge_cm ? parseFloat(groessenschaetzung.laenge_cm) : null,
+            breite_cm: groessenschaetzung.breite_cm ? parseFloat(groessenschaetzung.breite_cm) : null,
+            tiefe_cm: groessenschaetzung.tiefe_cm ? parseFloat(groessenschaetzung.tiefe_cm) : null
+          },
+          dfs_klassifikation: { verdacht_auf_dfs: dfsVerdacht },
+          schmerz: { pieks_test_empfehlung: false }
+        });
+      };
+
+      return (
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <Card className="p-5">
+            <h3 className="font-semibold text-gray-800 mb-3">Patient:innendaten</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input type="text" placeholder="Patient:innen-ID (optional)" value={patientId} onChange={(e) => setPatientId(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+              <input type="text" placeholder="Name (optional)" value={patientName} onChange={(e) => setPatientName(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <h3 className="font-semibold text-gray-800 mb-3">Wundlokalisation & Beschreibung</h3>
+            <textarea placeholder="Wundlokalisation und Vorgeschichte" value={wundbeschreibung} onChange={(e) => setWundbeschreibung(e.target.value)} required rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+          </Card>
+
+          <Card className="p-5">
+            <h3 className="font-semibold text-gray-800 mb-3">Wundfoto (optional)</h3>
+            {!image ? (
+              <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition text-center">
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                <div className="text-gray-500">Klick oder Datei hochladen</div>
+              </label>
+            ) : (
+              <div className="relative">
+                <img src={image} alt="Wundbild" className="w-full max-h-64 object-contain rounded-lg border border-gray-300" />
+                <button type="button" onClick={() => setImage(null)} className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow hover:bg-red-50">X</button>
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-5">
+            <h3 className="font-semibold text-gray-800 mb-3">Wundphase</h3>
+            <select value={wundphase} onChange={(e) => setWundphase(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+              {WOUND_PHASES.map((phase) => <option key={phase} value={phase}>{phase}</option>)}
+            </select>
+          </Card>
+
+          <Card className="p-5">
+            <h3 className="font-semibold text-gray-800 mb-3">Gewebetypen (%)</h3>
+            <p className="text-xs text-gray-500 mb-3">Summe: {Object.values(gewebetypen).reduce((a, b) => a + b, 0)}%</p>
+            <div className="space-y-2">
+              {Object.entries(TISSUE_TYPES).map(([key, label]) => (
+                <div key={key} className="flex items-center gap-3">
+                  <label className="text-sm text-gray-700 w-40">{label}</label>
+                  <input type="number" min="0" max="100" value={gewebetypen[key]} onChange={(e) => handleGewebeChange(key, e.target.value)} className="w-20 px-2 py-1 border border-gray-300 rounded text-sm" />
+                  <span className="text-sm text-gray-500">%</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <h3 className="font-semibold text-gray-800 mb-3">Exsudat</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Menge</label>
+                <select value={exsudat.menge} onChange={(e) => setExsudat({ ...exsudat, menge: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                  {EXUDATE_AMOUNTS.map((amt) => <option key={amt} value={amt}>{amt}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Art</label>
+                <select value={exsudat.art} onChange={(e) => setExsudat({ ...exsudat, art: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                  {EXUDATE_TYPES.map((typ) => <option key={typ} value={typ}>{typ}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Farbe (optional)</label>
+                <input type="text" placeholder="z.B. klar, gelblich" value={exsudat.farbe} onChange={(e) => setExsudat({ ...exsudat, farbe: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Geruch</label>
+                <select value={exsudat.geruch} onChange={(e) => setExsudat({ ...exsudat, geruch: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                  {EXUDATE_SMELLS.map((smell) => <option key={smell} value={smell}>{smell}</option>)}
+                </select>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <h3 className="font-semibold text-gray-800 mb-3">Wundrand</h3>
+            <select value={wundrand.zustand} onChange={(e) => setWundrand({ ...wundrand, zustand: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2">
+              <option value="intakt">Intakt</option>
+              <option value="mazeriert">Mazeriert</option>
+              <option value="hyperkeratotisch">Hyperkeratotisch</option>
+              <option value="erosiv">Erosiv</option>
+              <option value="nicht_beurteilbar">Nicht beurteilbar</option>
+            </select>
+            <textarea placeholder="Beschreibung" value={wundrand.beschreibung} onChange={(e) => setWundrand({ ...wundrand, beschreibung: e.target.value })} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+          </Card>
+
+          <Card className="p-5">
+            <h3 className="font-semibold text-gray-800 mb-3">Wundumgebung</h3>
+            <select value={wundumgebung.zustand} onChange={(e) => setWundumgebung({ ...wundumgebung, zustand: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2">
+              <option value="intakt">Intakt</option>
+              <option value="mazeriert">Mazeriert</option>
+              <option value="ekzematös">Ekzematös</option>
+              <option value="ödematös">Ödematös</option>
+              <option value="nicht_beurteilbar">Nicht beurteilbar</option>
+            </select>
+            <textarea placeholder="Beschreibung" value={wundumgebung.beschreibung} onChange={(e) => setWundumgebung({ ...wundumgebung, beschreibung: e.target.value })} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+          </Card>
+
+          <Card className="p-5">
+            <h3 className="font-semibold text-gray-800 mb-3">Infektionszeichen</h3>
+            <label className="flex items-center gap-2 text-sm mb-3">
+              <input type="checkbox" checked={infektionszeichen.vorhanden} onChange={(e) => setInfektionszeichen({ ...infektionszeichen, vorhanden: e.target.checked })} className="w-4 h-4" />
+              <span>Infektionszeichen vorhanden</span>
+            </label>
+            {infektionszeichen.vorhanden && (
+              <div className="space-y-2">
+                <textarea placeholder="Zeichen beschreiben" value={infektionszeichen.zeichen.join(", ")} onChange={(e) => setInfektionszeichen({ ...infektionszeichen, zeichen: e.target.value.split(",").map((s) => s.trim()) })} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <select value={infektionszeichen.schweregrad} onChange={(e) => setInfektionszeichen({ ...infektionszeichen, schweregrad: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                  <option value="leicht">Leicht</option>
+                  <option value="moderat">Moderat</option>
+                  <option value="schwer">Schwer</option>
+                </select>
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-5">
+            <h3 className="font-semibold text-gray-800 mb-3">Größenschätzung (cm)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Länge</label>
+                <input type="number" step="0.1" value={groessenschaetzung.laenge_cm} onChange={(e) => setGroessenschaetzung({ ...groessenschaetzung, laenge_cm: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Breite</label>
+                <input type="number" step="0.1" value={groessenschaetzung.breite_cm} onChange={(e) => setGroessenschaetzung({ ...groessenschaetzung, breite_cm: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Tiefe</label>
+                <input type="number" step="0.1" value={groessenschaetzung.tiefe_cm} onChange={(e) => setGroessenschaetzung({ ...groessenschaetzung, tiefe_cm: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={dfsVerdacht} onChange={(e) => setDfsVerdacht(e.target.checked)} className="w-4 h-4" />
+              <span>Verdacht auf diabetisches Fußsyndrom (DFS)</span>
+            </label>
+          </Card>
+
+          <Button type="submit" variant="primary" size="lg" className="w-full" disabled={loading || !wundbeschreibung}>
+            {loading ? "KI analysiert..." : "KI-Analyse starten"}
+          </Button>
+        </form>
+      );
+    }
+
+    function AssessmentResult({ assessment, onClose }) {
+      const [activeTab, setActiveTab] = useState("klinisch");
+      const [showDebug, setShowDebug] = useState(false);
+
+      const getPhaseClass = (phase) => {
+        const map = { Reinigungsphase: "phase-reinigung", Fibrinabbauphase: "phase-fibrinabbau", Granulationsphase: "phase-granulation", Epithelisierungsphase: "phase-epithelisierung", "Gemischte Phase": "phase-gemischt" };
+        return map[phase] || "phase-gemischt";
+      };
+
+      return (
+        <div className="space-y-5">
+          <Card className="p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-800">{assessment.patientName} (ID: {assessment.patientId})</h3>
+                <p className="text-xs text-gray-500 mt-1">{assessment.wundbeschreibung}</p>
+                <p className="text-xs text-gray-500">{new Date(assessment.timestamp).toLocaleString("de-DE")}</p>
+              </div>
+              <span className={`wound-phase-badge ${getPhaseClass(assessment.wundphase)}`}>{assessment.wundphase}</span>
+            </div>
+          </Card>
+
+          {assessment.image && <Card className="p-5"><img src={assessment.image} alt="Wundbild" className="w-full max-h-96 object-contain rounded-lg" /></Card>}
+
+          <Card className="p-5">
+            <div className="flex border-b border-gray-200">
+              <button onClick={() => setActiveTab("klinisch")} className={`tab-button ${activeTab === "klinisch" ? "active" : ""}`}>Klinischer Output für Pflege</button>
+              <button onClick={() => setActiveTab("patient")} className={`tab-button ${activeTab === "patient" ? "active" : ""}`}>Patient:inneninformation</button>
+            </div>
+
+            {activeTab === "klinisch" && (
+              <div className="mt-5 space-y-5">
+                <div className="source-warning">Warnung: KI-Aussagen ohne Quellenanzeige sind nicht für klinische Verwendung freigegeben.</div>
+                {assessment.klinischer_output?.strukturierte_wundbeschreibung && <div><h4 className="font-semibold text-gray-800 mb-2">Strukturierte Wundbeschreibung</h4><p className="text-sm text-gray-700 leading-relaxed">{assessment.klinischer_output.strukturierte_wundbeschreibung}</p></div>}
+                {assessment.klinischer_output?.pflegerische_einschaetzung && <div><h4 className="font-semibold text-gray-800 mb-2">Pflegerische Einschätzung</h4><p className="text-sm text-gray-700 leading-relaxed">{assessment.klinischer_output.pflegerische_einschaetzung}</p></div>}
+                {assessment.klinischer_output?.beobachtungsparameter?.length > 0 && <div><h4 className="font-semibold text-gray-800 mb-2">Beobachtungsparameter</h4><ul className="text-sm text-gray-700 space-y-1">{assessment.klinischer_output.beobachtungsparameter.map((p, i) => <li key={i} className="flex gap-2"><span className="text-blue-600">•</span><span>{p}</span></li>)}</ul></div>}
+                {assessment.klinischer_output?.pflegerische_massnahmen?.length > 0 && <div><h4 className="font-semibold text-gray-800 mb-2">Pflegerische Maßnahmen</h4><ul className="text-sm text-gray-700 space-y-1">{assessment.klinischer_output.pflegerische_massnahmen.map((m, i) => <li key={i} className="flex gap-2"><span className="text-green-600">+</span><span>{m}</span></li>)}</ul></div>}
+                {assessment.klinischer_output?.evaluationskriterien?.length > 0 && <div><h4 className="font-semibold text-gray-800 mb-2">Evaluation / Verlaufskontrolle</h4><ul className="text-sm text-gray-700 space-y-1">{assessment.klinischer_output.evaluationskriterien.map((k, i) => <li key={i} className="flex gap-2"><span className="text-orange-600">→</span><span>{k}</span></li>)}</ul></div>}
+                {assessment.klinischer_output?.eskalationshinweise && <div className="bg-red-50 border border-red-200 rounded-lg p-3"><h4 className="font-semibold text-red-800 mb-1">Eskalationshinweise</h4><p className="text-sm text-red-700">{assessment.klinischer_output.eskalationshinweise}</p></div>}
+                {assessment.materialversorgung?.benoetigt?.length > 0 && <div><h4 className="font-semibold text-gray-800 mb-2">Materialversorgung</h4><div className="space-y-2">{assessment.materialversorgung.benoetigt.map((m, i) => <div key={i} className="p-3 bg-gray-50 rounded-lg text-sm"><div className="font-medium text-gray-800">{m.name}</div><div className="text-gray-600">Menge: {m.menge}, Intervall: {m.intervall}, Bezug: {m.quelle}</div></div>)}</div></div>}
+                {(() => {
+                  const validQuellen = (assessment.quellen || []).filter(q => q.quelle || q.titel || q.begruendung);
+                  return validQuellen.length > 0 && (
+                    <div className="border-t border-gray-200 pt-4">
+                      <h4 className="font-semibold text-gray-800 mb-3">Quellen dieser Einschätzung</h4>
+                      <div className="space-y-3">
+                        {validQuellen.map((q, i) => (
+                          <div key={i} className="p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm">
+                            {q.quelle && <div className="font-semibold text-blue-900">{q.quelle}</div>}
+                            {q.titel && <div className="text-gray-700">Titel: {q.titel}</div>}
+                            {(q.stand || q.abrufdatum) && <div className="text-gray-600">{q.stand ? `Stand: ${q.stand}` : ""}{q.stand && q.abrufdatum ? " | " : ""}{q.abrufdatum ? `Abrufdatum: ${q.abrufdatum}` : ""}</div>}
+                            {q.begruendung && <div className="text-gray-700 mt-1 italic">Grund: {q.begruendung}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {activeTab === "patient" && (
+              <div className="mt-5 space-y-5">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3"><p className="text-sm text-blue-800">Diese Informationen sind in einfacher Sprache für Patient:innen und Angehörige geschrieben. Sie dienen als Orientierungshilfe für die Versorgung zu Hause.</p></div>
+                {assessment.patienteninformation?.was_wurde_gemacht && <div><h4 className="font-semibold text-gray-800 mb-2">Was wurde gemacht?</h4><p className="text-sm text-gray-700">{assessment.patienteninformation.was_wurde_gemacht}</p></div>}
+                {assessment.patienteninformation?.zu_hause_machen && <div><h4 className="font-semibold text-gray-800 mb-2">Was muss zu Hause gemacht werden?</h4><p className="text-sm text-gray-700">{assessment.patienteninformation.zu_hause_machen}</p></div>}
+                {assessment.patienteninformation?.verbandwechsel_intervall && <div><h4 className="font-semibold text-gray-800 mb-2">Wie oft Verbandwechsel?</h4><p className="text-sm text-gray-700">{assessment.patienteninformation.verbandwechsel_intervall}</p></div>}
+                {assessment.patienteninformation?.materialien_benoetigt && <div><h4 className="font-semibold text-gray-800 mb-2">Was wird dafür benötigt?</h4><p className="text-sm text-gray-700">{assessment.patienteninformation.materialien_benoetigt}</p></div>}
+                {assessment.patienteninformation?.materialien_bezug && <div><h4 className="font-semibold text-gray-800 mb-2">Woher bekommt man die Materialien?</h4><p className="text-sm text-gray-700">{assessment.patienteninformation.materialien_bezug}</p></div>}
+                {assessment.patienteninformation?.duschen_erlaubt && <div><h4 className="font-semibold text-gray-800 mb-2">Darf geduscht werden?</h4><p className="text-sm text-gray-700">{assessment.patienteninformation.duschen_erlaubt}</p></div>}
+                {assessment.patienteninformation?.zu_vermeiden?.filter(s => s && s.trim()).length > 0 && <div><h4 className="font-semibold text-gray-800 mb-2">Was soll vermieden werden?</h4><ul className="text-sm text-gray-700 space-y-1">{assessment.patienteninformation.zu_vermeiden.filter(s => s && s.trim()).map((item, i) => <li key={i} className="flex gap-2"><span className="text-red-600">X</span><span>{item}</span></li>)}</ul></div>}
+                {assessment.patienteninformation?.worauf_achten?.filter(s => s && s.trim()).length > 0 && <div><h4 className="font-semibold text-gray-800 mb-2">Worauf muss geachtet werden?</h4><ul className="text-sm text-gray-700 space-y-1">{assessment.patienteninformation.worauf_achten.filter(s => s && s.trim()).map((item, i) => <li key={i} className="flex gap-2"><span className="text-yellow-600">!</span><span>{item}</span></li>)}</ul></div>}
+                {assessment.patienteninformation?.red_flags?.filter(s => s && s.trim()).length > 0 && <div className="bg-red-50 border border-red-200 rounded-lg p-4"><h4 className="font-semibold text-red-900 mb-3">Warnsignale - Wann sofort Hilfe holen?</h4><ul className="space-y-2">{assessment.patienteninformation.red_flags.filter(s => s && s.trim()).map((flag, i) => <li key={i} className="red-flag-item text-gray-800">{flag}</li>)}</ul><p className="text-sm text-red-900 font-semibold mt-4">Bei Auffälligkeiten umgehend Kontakt mit behandelnder Stelle aufnehmen!</p></div>}
+                {assessment.patienteninformation?.ansprechperson && <div className="bg-blue-50 border border-blue-200 rounded-lg p-3"><h4 className="font-semibold text-blue-900 mb-1">Ansprechperson / Kontakt</h4><p className="text-sm text-blue-800">{assessment.patienteninformation.ansprechperson}</p></div>}
+                {!assessment.patienteninformation?.was_wurde_gemacht &&
+                 !assessment.patienteninformation?.zu_hause_machen &&
+                 !assessment.patienteninformation?.verbandwechsel_intervall &&
+                 (!assessment.patienteninformation?.red_flags || assessment.patienteninformation.red_flags.filter(s => s && s.trim()).length === 0) && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                    Keine Patient:inneninformationen verfügbar. Die KI hat keine Inhalte für diesen Bereich generiert. Bitte erneut versuchen oder Informationen manuell ergänzen.
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+
+          <div className="flex gap-2">
+            <Button onClick={onClose} variant="secondary" size="md" className="flex-1">Zurück</Button>
+            <button onClick={() => setShowDebug(!showDebug)} className="text-xs text-gray-400 hover:text-gray-600 p-2">{showDebug ? "Debug ausblenden" : "Debug anzeigen"}</button>
+          </div>
+
+          {showDebug && <Card className="p-4"><pre className="bg-gray-900 text-green-400 rounded-lg p-4 text-xs overflow-auto max-h-96 font-mono">{JSON.stringify(assessment, null, 2)}</pre></Card>}
+        </div>
+      );
+    }
+
+    function PatientManagement({ patients, onSelectPatient, onDeleteAssessment }) {
+      return (
+        <div className="space-y-3">
+          <h3 className="font-semibold text-gray-800 mb-3">Assessments ({patients.length})</h3>
+          {patients.length === 0 ? (
+            <Card className="p-5 text-center"><p className="text-gray-500 text-sm">Noch keine Assessments erstellt</p></Card>
+          ) : (
+            patients.map((assessment) => (
+              <Card key={assessment.id} className="p-3 cursor-pointer hover:shadow-md transition">
+                <div onClick={() => onSelectPatient(assessment)}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-800 text-sm">{assessment.patientName}</div>
+                      <div className="text-xs text-gray-500">ID: {assessment.patientId}</div>
+                      <div className="text-xs text-gray-600 mt-1 line-clamp-2">{assessment.wundbeschreibung}</div>
+                      <div className="text-xs text-gray-400 mt-1">{new Date(assessment.timestamp).toLocaleString("de-DE")}</div>
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); onDeleteAssessment(assessment.id); }} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600">X</button>
+                  </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      );
+    }
+
+    function AgentStatusPanel({ apiMode, apiKey, ollamaUrl, lastAssessment }) {
+      const [agents, setAgents] = useState([
+        { id: "start", name: "Start-Agent", desc: "HTML & React geladen", status: "prüft", result: "", cause: "", action: "" },
+        { id: "api", name: "API-Agent", desc: "Claude API Status", status: "wartet", result: "", cause: "", action: "" },
+        { id: "ollama", name: "Ollama-Agent", desc: "Ollama Server Status", status: "wartet", result: "", cause: "", action: "" },
+        { id: "quellen", name: "Quellen-Agent", desc: "Quellenfelder-Vollständigkeit", status: "wartet", result: "", cause: "", action: "" },
+        { id: "patient", name: "Patient:inneninfo-Agent", desc: "Validität der Patienteninhalte", status: "wartet", result: "", cause: "", action: "" },
+      ]);
+
+      const updateAgent = (id, updates) => {
+        setAgents(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+      };
+
+      useEffect(() => {
+        const timer = setTimeout(() => {
+          updateAgent("start", { status: "erfolgreich", result: "HTML geladen, React initialisiert, App gerendert.", cause: "-", action: "-" });
+
+          if (apiMode === "anthropic" && apiKey) {
+            updateAgent("api", { status: "prüft" });
+            testAnthropicKey(apiKey).then(r => {
+              if (r.ok) {
+                updateAgent("api", { status: "erfolgreich", result: "API-Key gültig, Verbindung OK.", cause: "-", action: "-" });
+              } else {
+                updateAgent("api", { status: "fehler", result: "API nicht erreichbar.", cause: r.error, action: "API-Key in Einstellungen prüfen." });
+              }
+            });
+          } else if (apiMode === "anthropic") {
+            updateAgent("api", { status: "fehler", result: "Kein API-Key konfiguriert.", cause: "API-Key fehlt.", action: "In Einstellungen API-Key eintragen." });
+          } else if (apiMode === "demo") {
+            updateAgent("api", { status: "wartet", result: "Demo-Modus aktiv, kein API-Zugriff nötig.", cause: "", action: "" });
+          } else {
+            updateAgent("api", { status: "wartet", result: "Ollama-Modus: Claude API nicht benötigt.", cause: "", action: "" });
+          }
+
+          if (apiMode === "ollama") {
+            updateAgent("ollama", { status: "prüft" });
+            testOllamaConnection(ollamaUrl).then(r => {
+              if (r.ok && r.hasLlava) {
+                updateAgent("ollama", { status: "erfolgreich", result: `Verbunden. Modelle: ${r.models.join(", ")}. llava verfügbar.`, cause: "-", action: "-" });
+              } else if (r.ok && !r.hasLlava) {
+                updateAgent("ollama", { status: "fehler", result: "Server erreichbar, aber llava fehlt.", cause: "Modell nicht installiert.", action: "ollama pull llava ausführen." });
+              } else {
+                updateAgent("ollama", { status: "fehler", result: "Ollama nicht erreichbar.", cause: r.error, action: "ollama serve starten und URL prüfen." });
+              }
+            });
+          } else if (apiMode === "demo") {
+            updateAgent("ollama", { status: "wartet", result: "Demo-Modus aktiv, Ollama nicht benötigt.", cause: "", action: "" });
+          } else {
+            updateAgent("ollama", { status: "wartet", result: "API-Modus: Ollama nicht benötigt.", cause: "", action: "" });
+          }
+
+          updateAgent("quellen", { status: "wartet", result: "Prüfung erfolgt nach Analyse.", cause: "", action: "Assessment durchführen um Quellen zu prüfen." });
+          updateAgent("patient", { status: "wartet", result: "Prüfung erfolgt nach Analyse.", cause: "", action: "Assessment durchführen um Patienteninfo zu prüfen." });
+        }, 500);
+
+        return () => clearTimeout(timer);
+      }, [apiMode, apiKey, ollamaUrl]);
+
+      useEffect(() => {
+        if (!lastAssessment) return;
+
+        const quellen = lastAssessment.quellen || [];
+        const validQuellen = quellen.filter(q => q.quelle || q.titel);
+        const quellenWithStand = quellen.filter(q => q.stand && q.abrufdatum);
+        if (validQuellen.length === 0) {
+          updateAgent("quellen", { status: "fehler", result: "Keine gültigen Quellen vorhanden.", cause: "KI hat keine Quellen generiert.", action: "Analyse wiederholen oder Quellen manuell ergänzen." });
+        } else if (quellenWithStand.length < validQuellen.length) {
+          updateAgent("quellen", { status: "fehler", result: `${validQuellen.length} Quelle(n), aber ${validQuellen.length - quellenWithStand.length} ohne Stand/Abrufdatum.`, cause: "Unvollständige Quellenangaben.", action: "Quellen manuell ergänzen." });
+        } else {
+          updateAgent("quellen", { status: "erfolgreich", result: `${validQuellen.length} vollständige Quelle(n) vorhanden.`, cause: "-", action: "-" });
+        }
+
+        const pi = lastAssessment.patienteninformation || {};
+        const filledFields = ["was_wurde_gemacht", "zu_hause_machen", "verbandwechsel_intervall", "materialien_benoetigt", "duschen_erlaubt", "ansprechperson"].filter(f => pi[f] && pi[f].trim());
+        const filledArrays = ["zu_vermeiden", "worauf_achten", "red_flags"].filter(f => Array.isArray(pi[f]) && pi[f].filter(s => s && s.trim()).length > 0);
+        const totalFilled = filledFields.length + filledArrays.length;
+        if (totalFilled === 0) {
+          updateAgent("patient", { status: "fehler", result: "Patient:inneninformation komplett leer.", cause: "KI hat keine Patienteninhalte generiert.", action: "Analyse wiederholen." });
+        } else if (totalFilled < 5) {
+          updateAgent("patient", { status: "fehler", result: `Nur ${totalFilled}/9 Felder ausgefüllt.`, cause: "Unvollständige Patienteninformation.", action: "Fehlende Felder manuell ergänzen." });
+        } else {
+          updateAgent("patient", { status: "erfolgreich", result: `${totalFilled}/9 Felder ausgefüllt.`, cause: "-", action: "-" });
+        }
+      }, [lastAssessment]);
+
+      const statusColors = {
+        wartet: { bg: "bg-gray-50", border: "border-gray-200", dot: "bg-gray-400", text: "text-gray-600" },
+        "prüft": { bg: "bg-blue-50", border: "border-blue-200", dot: "bg-blue-500 animate-pulse", text: "text-blue-700" },
+        erfolgreich: { bg: "bg-green-50", border: "border-green-200", dot: "bg-green-500", text: "text-green-700" },
+        warnung: { bg: "bg-yellow-50", border: "border-yellow-300", dot: "bg-yellow-500", text: "text-yellow-800" },
+        fehler: { bg: "bg-red-50", border: "border-red-200", dot: "bg-red-500", text: "text-red-700" },
+      };
+
+      return (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-800 text-sm">Systemdiagnostik</h3>
+            <span className="text-xs text-gray-400">Agenten-Status</span>
+          </div>
+          <div className="space-y-2">
+            {agents.map((agent) => {
+              const colors = statusColors[agent.status] || statusColors.wartet;
+              return (
+                <div key={agent.id} className={`p-3 rounded-lg border ${colors.bg} ${colors.border}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className={`w-2.5 h-2.5 rounded-full ${colors.dot}`}></div>
+                    <span className={`font-medium text-sm ${colors.text}`}>{agent.name}</span>
+                    <span className="text-xs text-gray-400 ml-auto">{agent.status}</span>
+                  </div>
+                  <p className="text-xs text-gray-600 ml-5">{agent.desc}</p>
+                  {agent.result && <p className="text-xs text-gray-700 ml-5 mt-1">{agent.result}</p>}
+                  {agent.cause && agent.cause !== "-" && <p className="text-xs text-red-600 ml-5">Ursache: {agent.cause}</p>}
+                  {agent.action && agent.action !== "-" && <p className="text-xs text-blue-600 ml-5">Aktion: {agent.action}</p>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [currentView, setCurrentView] = useState("home");
+      const [assessments, setAssessments] = useState([DEMO_ASSESSMENT]);
+      const [selectedAssessment, setSelectedAssessment] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [apiMode, setApiMode] = useState("demo");
+      const [apiKey, setApiKey] = useState("");
+      const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
+      const [errorInfo, setErrorInfo] = useState(null); // { message, details, canFallback }
+      const [statusMessage, setStatusMessage] = useState(""); // Fortschrittsanzeige
+      const [connectionStatus, setConnectionStatus] = useState(null); // { ollama, anthropic }
+
+      // Verbindungstest-Handler für Settings
+      const handleTestOllama = async () => {
+        setConnectionStatus(prev => ({ ...prev, ollama: { testing: true } }));
+        const result = await testOllamaConnection(ollamaUrl);
+        setConnectionStatus(prev => ({ ...prev, ollama: { ...result, testing: false } }));
+      };
+      const handleTestAnthropic = async () => {
+        if (!apiKey) { setConnectionStatus(prev => ({ ...prev, anthropic: { ok: false, error: "Kein API-Key eingegeben." } })); return; }
+        setConnectionStatus(prev => ({ ...prev, anthropic: { testing: true } }));
+        const result = await testAnthropicKey(apiKey);
+        setConnectionStatus(prev => ({ ...prev, anthropic: { ...result, testing: false } }));
+      };
+
+      const handleAssessmentSubmit = async (formData) => {
+        setLoading(true);
+        setErrorInfo(null);
+        setStatusMessage("");
+        try {
+          let analysisResult;
+
+          if (apiMode === "demo") {
+            setStatusMessage("Demo-Daten werden geladen...");
+            analysisResult = DEMO_ASSESSMENT;
+
+          } else if (apiMode === "anthropic") {
+            if (!apiKey) {
+              setErrorInfo({ message: "Kein API-Key eingegeben", details: "Bitte in den Einstellungen einen Anthropic API-Key eintragen.", canFallback: true });
+              setLoading(false);
+              return;
+            }
+
+            // CORS-Warnung bei file://
+            const corsWarning = checkFileProtocolWarning();
+            if (corsWarning) {
+              setErrorInfo({ message: "CORS-Problem erkannt", details: corsWarning, canFallback: true });
+              setLoading(false);
+              return;
+            }
+
+            // Bild komprimieren falls nötig
+            let processedImage = formData.image;
+            if (processedImage) {
+              const originalSizeKB = getBase64SizeKB(processedImage);
+              if (originalSizeKB > 20000) {
+                setErrorInfo({ message: "Bild zu groß", details: `Das Bild ist ${Math.round(originalSizeKB/1024)}MB groß. Maximum: ~20MB. Bitte ein kleineres Bild verwenden oder das Bild zuschneiden.`, canFallback: false });
+                setLoading(false);
+                return;
+              }
+              if (originalSizeKB > 4000) {
+                setStatusMessage(`Bild wird komprimiert (${Math.round(originalSizeKB/1024)}MB → max 4MB)...`);
+                try {
+                  processedImage = await compressImageIfNeeded(processedImage, 4000);
+                } catch (compErr) {
+                  console.warn("Komprimierung fehlgeschlagen, verwende Original:", compErr);
+                }
+              }
+            }
+
+            setStatusMessage("Verbindung zu Anthropic API wird aufgebaut...");
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s für große Bilder
+            let fetchStartTime = Date.now();
+
+            try {
+              const detectedMime = processedImage ? detectImageMediaType(processedImage, formData.imageFileType) : null;
+              const cleanBase64 = processedImage ? processedImage.replace(/^data:image\/[^;]+;base64,/, "") : null;
+
+              // Validiere MIME-Type
+              const allowedMimes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+              if (detectedMime && !allowedMimes.includes(detectedMime)) {
+                clearTimeout(timeoutId);
+                throw new Error(`Bildformat '${detectedMime}' wird nicht unterstützt. Erlaubte Formate: JPEG, PNG, WebP, GIF.`);
+              }
+
+              // Validiere Base64
+              if (cleanBase64 && cleanBase64.length < 100) {
+                clearTimeout(timeoutId);
+                throw new Error("Bild-Daten sind zu kurz oder beschädigt. Bitte ein anderes Bild hochladen.");
+              }
+
+              const textPrompt = `Analysiere ${processedImage ? "dieses Wundbild" : ""} pflegerisch.\n\nWundbeschreibung: ${formData.wundbeschreibung}\nWundphase: ${formData.wundphase}\nGewebetypen: ${JSON.stringify(formData.gewebetypen)}\nExsudat: ${JSON.stringify(formData.exsudat)}\nWundrand: ${JSON.stringify(formData.wundrand)}\nWundumgebung: ${JSON.stringify(formData.wundumgebung)}\nInfektionszeichen: ${JSON.stringify(formData.infektionszeichen)}\nGrößenschätzung: ${JSON.stringify(formData.groessenschaetzung)}\n\nAntworte NUR mit dem JSON-Objekt gemäß der vorgegebenen Struktur. ALLE Felder müssen ausgefüllt sein. Besonders wichtig: klinischer_output (alle 6 Felder), patienteninformation (alle 10 Felder), materialversorgung, quellen.`;
+
+              const userContent = processedImage
+                ? [
+                    { type: "image", source: { type: "base64", media_type: detectedMime, data: cleanBase64 } },
+                    { type: "text", text: textPrompt }
+                  ]
+                : textPrompt;
+
+              const response = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-api-key": apiKey,
+                  "anthropic-version": "2023-06-01",
+                  "anthropic-dangerous-direct-browser-access": "true"
+                },
+                body: JSON.stringify({
+                  model: "claude-sonnet-4-20250514",
+                  max_tokens: 4096,
+                  system: NURSING_SYSTEM_PROMPT,
+                  messages: [{ role: "user", content: userContent }]
+                }),
+                signal: controller.signal
+              });
+              clearTimeout(timeoutId);
+
+              const fetchDuration = Date.now() - fetchStartTime;
+              setStatusMessage(`KI-Antwort wird verarbeitet... (${Math.round(fetchDuration/1000)}s)`);
+
+              if (!response.ok) {
+                const errText = await response.text().catch(() => "");
+                if (response.status === 401) throw new Error("API-Key ungültig oder abgelaufen (401). Prüfe den Key in den Einstellungen.");
+                if (response.status === 403) throw new Error("Zugriff verweigert (403). Der API-Key hat keine Berechtigung für dieses Modell.");
+                if (response.status === 429) throw new Error("Rate-Limit erreicht (429). Bitte 30–60 Sekunden warten und erneut versuchen.");
+                if (response.status === 400) {
+                  if (errText.includes("media_type")) throw new Error("Bildformat wird von der API nicht akzeptiert (400). Bitte ein JPEG- oder PNG-Bild verwenden.");
+                  if (errText.includes("too large") || errText.includes("size")) throw new Error("Request zu groß (400). Das Bild ist nach Komprimierung noch zu groß. Bitte ein kleineres Bild verwenden.");
+                  if (errText.includes("base64")) throw new Error("Base64-Daten ungültig (400). Das Bild ist möglicherweise beschädigt. Bitte erneut hochladen.");
+                  throw new Error(`API-Payload-Fehler (400): ${errText.substring(0, 200)}`);
+                }
+                if (response.status === 500 || response.status === 503) throw new Error(`Anthropic-Server vorübergehend nicht verfügbar (${response.status}). Bitte in 1–2 Minuten erneut versuchen.`);
+                throw new Error(`API-Fehler ${response.status}: ${errText.substring(0, 200) || response.statusText}`);
+              }
+              const data = await response.json();
+              const content = data.content?.[0]?.text || "";
+              if (!content.trim()) throw new Error("Die KI hat eine leere Antwort zurückgegeben. Bitte erneut versuchen.");
+
+              let parsed = null;
+              try { parsed = JSON.parse(content); } catch (e) {
+                const jsonMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+                if (jsonMatch) { try { parsed = JSON.parse(jsonMatch[1].trim()); } catch (e2) {} }
+                if (!parsed) {
+                  const f = content.indexOf("{"), l = content.lastIndexOf("}");
+                  if (f !== -1 && l > f) { try { parsed = JSON.parse(content.substring(f, l + 1)); } catch (e3) {} }
+                }
+              }
+              if (!parsed) throw new Error("KI-Antwort konnte nicht als JSON interpretiert werden. Bitte erneut versuchen.");
+              analysisResult = validateAssessment(parsed);
+            } catch (innerErr) {
+              clearTimeout(timeoutId);
+              throw innerErr;
+            }
+
+          } else if (apiMode === "ollama") {
+            // Vor-Test: Ollama-Server erreichbar?
+            setStatusMessage("Ollama-Verbindung wird geprüft...");
+            const connTest = await testOllamaConnection(ollamaUrl);
+            if (!connTest.ok) {
+              setErrorInfo({ message: "Ollama nicht erreichbar", details: connTest.error, canFallback: true });
+              setLoading(false);
+              return;
+            }
+            if (!connTest.hasLlava) {
+              setErrorInfo({
+                message: "Modell 'llava' nicht gefunden",
+                details: `Verfügbare Modelle: ${connTest.models.length > 0 ? connTest.models.join(", ") : "keine"}. Bitte installieren mit: ollama pull llava`,
+                canFallback: true
+              });
+              setLoading(false);
+              return;
+            }
+
+            setStatusMessage("Wundanalyse über Ollama (lokal)...");
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 120000); // 2 Min für lokale Modelle
+
+            const response = await fetch(`${ollamaUrl}/api/chat`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: "llava",
+                messages: [
+                  { role: "system", content: NURSING_SYSTEM_PROMPT },
+                  {
+                    role: "user",
+                    content: `Analysiere pflegerisch:\n\nWundbeschreibung: ${formData.wundbeschreibung}\nWundphase: ${formData.wundphase}\nGewebetypen: ${JSON.stringify(formData.gewebetypen)}\nExsudat: ${JSON.stringify(formData.exsudat)}\nWundrand: ${JSON.stringify(formData.wundrand)}\nWundumgebung: ${JSON.stringify(formData.wundumgebung)}\nInfektionszeichen: ${JSON.stringify(formData.infektionszeichen)}\n\nAntworte NUR mit dem JSON-Objekt gemäß der vorgegebenen Struktur. ALLE Felder müssen ausgefüllt sein.`,
+                    ...(formData.image ? { images: [formData.image.replace(/^data:image\/[^;]+;base64,/, "")] } : {})
+                  }
+                ],
+                stream: false
+              }),
+              signal: controller.signal
+            });
+            clearTimeout(timeout);
+
+            setStatusMessage("Ollama-Antwort wird verarbeitet...");
+
+            if (!response.ok) {
+              const errText = await response.text().catch(() => "");
+              throw new Error(`Ollama-Fehler ${response.status}: ${errText || "Unbekannter Fehler"}`);
+            }
+            const data = await response.json();
+            const rawText = data.message?.content || data.response || "";
+            if (!rawText.trim()) throw new Error("Ollama hat eine leere Antwort zurückgegeben. Bitte erneut versuchen.");
+
+            let parsed = null;
+            try { parsed = JSON.parse(rawText); } catch (e) {
+              const jsonMatch = rawText.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+              if (jsonMatch) { try { parsed = JSON.parse(jsonMatch[1].trim()); } catch (e2) {} }
+              if (!parsed) {
+                const f = rawText.indexOf("{"), l = rawText.lastIndexOf("}");
+                if (f !== -1 && l > f) { try { parsed = JSON.parse(rawText.substring(f, l + 1)); } catch (e3) {} }
+              }
+            }
+            if (!parsed) throw new Error("Ollama-Antwort konnte nicht als JSON interpretiert werden. Modell antwortet möglicherweise nicht im erwarteten Format.");
+            analysisResult = validateAssessment(parsed);
+          }
+
+          setStatusMessage("");
+          const newAssessment = { id: "assessment-" + Date.now(), ...formData, ...analysisResult, timestamp: new Date().toISOString() };
+          setAssessments([newAssessment, ...assessments]);
+          setSelectedAssessment(newAssessment);
+          setCurrentView("result");
+
+        } catch (error) {
+          console.error("Analysefehler:", error);
+          let errorMsg, details;
+
+          if (error.name === "AbortError") {
+            const imageSizeKB = formData.image ? getBase64SizeKB(formData.image) : 0;
+            const sizeHint = imageSizeKB > 2000 ? ` Das Bild ist ${Math.round(imageSizeKB/1024)}MB groß — das verlängert die Verarbeitungszeit.` : "";
+            if (apiMode === "ollama") {
+              errorMsg = "Zeitüberschreitung: Ollama hat zu lange gebraucht (>2 Min).";
+              details = `Das Modell ist möglicherweise überlastet oder nicht geladen.${sizeHint} Prüfe: (1) ollama serve läuft, (2) genügend RAM verfügbar, (3) Modell vollständig geladen.`;
+            } else {
+              errorMsg = "Zeitüberschreitung: Die API hat nicht innerhalb von 90 Sekunden geantwortet.";
+              details = `Mögliche Ursachen:${sizeHint} (1) Langsame Internetverbindung, (2) API vorübergehend überlastet, (3) Bild zu komplex. Nächste Schritte: Erneut versuchen oder kleineres Bild verwenden.`;
+            }
+          } else if (error.message?.includes("Failed to fetch") || error.message?.includes("NetworkError") || error.message?.includes("Load failed")) {
+            if (window.location.protocol === "file:") {
+              errorMsg = "CORS-Fehler: Browser blockiert API-Zugriff von file://";
+              details = "Die App wird direkt als Datei geöffnet. Browser blockieren in diesem Fall API-Zugriffe. Lösung: Öffne die App über einen lokalen HTTP-Server: python3 -m http.server 8080 und dann http://localhost:8080/WundScan-AI.html aufrufen.";
+            } else if (apiMode === "anthropic") {
+              errorMsg = "Netzwerkfehler beim Zugriff auf die Anthropic API";
+              details = "Prüfe: (1) Internetverbindung aktiv? (2) Firewall/Proxy blockiert api.anthropic.com? (3) VPN aktiv? Nächster Schritt: Internetverbindung prüfen und erneut versuchen.";
+            } else if (apiMode === "ollama") {
+              errorMsg = "Netzwerkfehler beim Zugriff auf Ollama";
+              details = `Verbindung zu ${ollamaUrl} fehlgeschlagen. Prüfe: (1) Ist Ollama gestartet? (ollama serve), (2) Ist die URL korrekt? (3) Läuft Ollama auf dem richtigen Port?`;
+            } else {
+              errorMsg = "Netzwerkfehler";
+              details = error.message;
+            }
+          } else {
+            errorMsg = error.message || "Unbekannter Fehler bei der Analyse";
+            details = apiMode === "anthropic"
+              ? "Nächste Schritte: (1) API-Key in Einstellungen prüfen, (2) Verbindung testen, (3) Erneut versuchen."
+              : apiMode === "ollama"
+              ? "Mögliche Ursachen: Ollama nicht gestartet, Modell nicht geladen, falsche URL."
+              : "";
+          }
+          setErrorInfo({ message: errorMsg, details, canFallback: true });
+        } finally {
+          setLoading(false);
+          setStatusMessage("");
+        }
+      };
+
+      const handleDeleteAssessment = (id) => {
+        if (confirm("Assessment wirklich löschen?")) {
+          setAssessments(assessments.filter((a) => a.id !== id));
+          if (selectedAssessment?.id === id) { setSelectedAssessment(null); setCurrentView("home"); }
+        }
+      };
+
+      return (
+        <>
+          <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+            <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+              <button onClick={() => { setCurrentView("home"); setSelectedAssessment(null); }} className="flex items-center gap-2 hover:opacity-80 transition">
+                <span className="text-2xl">🩺</span>
+                <div><span className="font-bold text-gray-800">WundScan AI</span><span className="text-xs text-gray-400 ml-2">v{APP_VERSION}</span></div>
+              </button>
+              <div className="flex items-center gap-3">
+                <span className={`text-xs font-medium px-2 py-1 rounded-full ${apiMode === "demo" ? "bg-yellow-100 text-yellow-800" : apiMode === "anthropic" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"}`}>{apiMode === "demo" ? "Demo" : apiMode === "anthropic" ? "API" : "Ollama"}</span>
+                <button onClick={() => setCurrentView("settings")} className="p-2 rounded-lg hover:bg-gray-100 transition">Settings</button>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-4xl mx-auto px-4 py-6">
+
+            {/* Status-Anzeige während Analyse */}
+            {loading && statusMessage && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm text-blue-800 font-medium">{statusMessage}</span>
+              </div>
+            )}
+
+            {/* Fehler-Anzeige (statt alert) */}
+            {errorInfo && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-300 rounded-lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-red-800">{errorInfo.message}</p>
+                    {errorInfo.details && <p className="text-sm text-red-700 mt-1">{errorInfo.details}</p>}
+                  </div>
+                  <button onClick={() => setErrorInfo(null)} className="text-red-400 hover:text-red-600 font-bold text-lg leading-none">&times;</button>
+                </div>
+                {errorInfo.canFallback && (
+                  <div className="mt-3 flex gap-2">
+                    <button onClick={() => { setApiMode("demo"); setErrorInfo(null); }} className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium hover:bg-yellow-200 transition">Zum Demo-Modus wechseln</button>
+                    <button onClick={() => { setCurrentView("settings"); setErrorInfo(null); }} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition">Einstellungen prüfen</button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <AgentStatusPanel apiMode={apiMode} apiKey={apiKey} ollamaUrl={ollamaUrl} lastAssessment={selectedAssessment} />
+
+            {currentView === "home" && !selectedAssessment && (
+              <>
+                <div className="mb-6 p-4 bg-amber-50 border-l-4 border-amber-500 rounded-r-lg">
+                  <p className="font-semibold text-amber-900 text-sm">Disclaimer</p>
+                  <p className="text-amber-800 text-sm mt-1">Dieses Tool unterstützt die pflegerische Einschätzung und Dokumentation. Es ersetzt keine ärztliche Diagnose oder Therapieentscheidung. KI-Aussagen ohne Quellenanzeige sind nicht für klinische Verwendung freigegeben.</p>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-5">Neue Einschätzung</h2>
+                  <AssessmentForm onSubmit={handleAssessmentSubmit} loading={loading} />
+                  <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                    <p className="font-semibold mb-2">Hinweise:</p>
+                    <ul className="list-disc list-inside space-y-1 text-xs">
+                      <li><strong>Nur Pflege:</strong> Unterstützt pflegerische Einschätzung, ersetzt keine ärztliche Diagnose.</li>
+                      <li><strong>Quellenpflicht:</strong> KI-Aussagen ohne Quellenanzeige nicht für klinische Verwendung freigegeben.</li>
+                      <li><strong>Materialien:</strong> Nur dokumentierte OÖG-gelistete Verbandmaterialien.</li>
+                      <li><strong>Eskalation:</strong> Bei Red Flags sofort ärztliche Einschätzung einholen.</li>
+                    </ul>
+                  </div>
+                </div>
+                <div>
+                  <PatientManagement patients={assessments} onSelectPatient={(a) => { setSelectedAssessment(a); setCurrentView("result"); }} onDeleteAssessment={handleDeleteAssessment} />
+                  <Card className="p-5 mt-4">
+                    <h3 className="font-semibold text-gray-800 mb-3">Wissensbasis / Quellen</h3>
+                    <div className="space-y-3 text-sm text-gray-700">
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                        <p className="font-medium text-blue-900">AMBOSS Pflegewissen</p>
+                        <p className="text-xs text-blue-700 mt-1">Wundversorgung, Verbandswechsel, chronische Wunden</p>
+                      </div>
+                      <div className="p-3 bg-green-50 rounded-lg border border-green-100">
+                        <p className="font-medium text-green-900">Lokale Standards / SOPs</p>
+                        <p className="text-xs text-green-700 mt-1">Hausinterne Vorgaben OÖG, Wundmanagement-Standards</p>
+                      </div>
+                      <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                        <p className="font-medium text-purple-900">Validierte interne Vorgaben</p>
+                        <p className="text-xs text-purple-700 mt-1">Geprüfte Pflegestandards und Dokumentationsrichtlinien</p>
+                      </div>
+                      <p className="text-xs text-gray-500 italic mt-2">Pflegerische Inhalte beruhen auf AMBOSS Pflegewissen, lokalen OÖG-Standards und validierten internen Vorgaben.</p>
+                    </div>
+                  </Card>
+                </div>
+              </div>
+              </>
+            )}
+
+            {currentView === "result" && selectedAssessment && (
+              <AssessmentResult assessment={selectedAssessment} onClose={() => { setSelectedAssessment(null); setCurrentView("home"); }} />
+            )}
+
+            {currentView === "settings" && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="p-6">
+                  <h2 className="text-xl font-bold text-gray-800 mb-4">Einstellungen</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="font-semibold text-gray-800 mb-3">API-Modus</p>
+                      <div className="space-y-2">
+                        {[{ key: "anthropic", label: "Anthropic Claude API", icon: "🤖" }, { key: "ollama", label: "Ollama (Lokal)", icon: "🏠" }, { key: "demo", label: "Demo-Modus", icon: "🧪" }].map((mode) => (
+                          <button key={mode.key} onClick={() => setApiMode(mode.key)} className={`w-full p-3 rounded-lg border text-left transition ${apiMode === mode.key ? "border-blue-500 bg-blue-50 text-blue-700 font-semibold" : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
+                            <div className="text-lg">{mode.icon}</div>
+                            <div className="font-medium">{mode.label}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {apiMode === "anthropic" && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Anthropic API-Key</label>
+                        <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-ant-..." className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                        <p className="text-xs text-gray-500 mt-2">Holen Sie sich einen Key unter <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">console.anthropic.com</a></p>
+                        <button onClick={handleTestAnthropic} disabled={connectionStatus?.anthropic?.testing} className="mt-2 px-3 py-1.5 bg-green-100 text-green-800 rounded-lg text-sm font-medium hover:bg-green-200 transition disabled:opacity-50">
+                          {connectionStatus?.anthropic?.testing ? "Teste..." : "Verbindung testen"}
+                        </button>
+                        {connectionStatus?.anthropic && !connectionStatus.anthropic.testing && (
+                          <div className={`mt-2 p-2 rounded text-sm ${connectionStatus.anthropic.ok ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+                            {connectionStatus.anthropic.ok ? (connectionStatus.anthropic.warning || "Verbindung erfolgreich!") : connectionStatus.anthropic.error}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {apiMode === "ollama" && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Ollama Server URL</label>
+                        <input type="text" value={ollamaUrl} onChange={(e) => setOllamaUrl(e.target.value)} placeholder="http://localhost:11434" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                        <button onClick={handleTestOllama} disabled={connectionStatus?.ollama?.testing} className="mt-2 px-3 py-1.5 bg-green-100 text-green-800 rounded-lg text-sm font-medium hover:bg-green-200 transition disabled:opacity-50">
+                          {connectionStatus?.ollama?.testing ? "Teste..." : "Verbindung testen"}
+                        </button>
+                        {connectionStatus?.ollama && !connectionStatus.ollama.testing && (
+                          <div className={`mt-2 p-2 rounded text-sm ${connectionStatus.ollama.ok ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+                            {connectionStatus.ollama.ok
+                              ? `Verbunden! ${connectionStatus.ollama.hasLlava ? "Modell 'llava' verfügbar." : "WARNUNG: 'llava' nicht gefunden! Verfügbar: " + (connectionStatus.ollama.models?.join(", ") || "keine")}`
+                              : connectionStatus.ollama.error}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+                <Card className="p-6">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Über WundScan AI</h3>
+                  <div className="space-y-4 text-sm text-gray-700">
+                    <div><p className="font-semibold text-gray-800 mb-1">Version</p><p>{APP_VERSION}</p></div>
+                    <div><p className="font-semibold text-gray-800 mb-1">Pflegerische Anpassung / klinische Ausarbeitung</p><p>Claudiu Droniec</p></div>
+                    <div><p className="font-semibold text-gray-800 mb-1">Grundidee</p><p>PL Klaus Pointner, MBA</p></div>
+                    <div><p className="font-semibold text-gray-800 mb-1">Wissensbasis</p><p>AMBOSS Pflegewissen, lokale Standards, validierte interne Vorgaben</p></div>
+                    <div><p className="font-semibold text-gray-800 mb-1">AMBOSS Referenzen</p><p className="text-gray-600 text-xs">"Chronische Wunden und Wundbehandlung" (Stand 27.01.2026)</p></div>
+                    <div className="border-t border-gray-200 pt-4 mt-4">
+                      <p className="font-semibold text-gray-800 mb-2">Disclaimer</p>
+                      <p className="text-gray-600 text-xs leading-relaxed">Dieses Tool unterstützt die pflegerische Einschätzung und Dokumentation. Es ersetzt keine ärztliche Diagnose oder Therapieentscheidung.</p>
+                      <p className="text-red-700 font-semibold text-xs mt-2">KI-Aussagen ohne Quellenanzeige sind nicht für klinische Verwendung freigegeben.</p>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )}
+
+            <footer className="mt-12 pt-6 border-t border-gray-200 text-center text-xs text-gray-400">
+              <p>Pflegerische Anpassung / klinische Ausarbeitung: Claudiu Droniec | Grundidee: Klaus Pointner</p>
+              <p className="mt-1">Wissensbasis: AMBOSS Pflegewissen, lokale OÖG-Standards, validierte interne Vorgaben</p>
+            </footer>
+          </main>
+        </>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+
+    const loadingScreen = document.getElementById("loading-screen");
+    if (loadingScreen) setTimeout(() => loadingScreen.classList.add("fade"), 300);
+  </script>
+</body>
+</html>

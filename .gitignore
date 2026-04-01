@@ -1,0 +1,8 @@
+﻿venv/
+.env
+*.pid
+__pycache__/
+kairos_chroma_db/
+kairos_logs.txt
+kairos_memory.json
+*.pyc

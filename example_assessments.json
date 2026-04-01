@@ -1,0 +1,257 @@
+{
+  "_comment": "Synthetische Beispiel-Assessments für Testzwecke. KEINE echten Patientendaten.",
+  "patients": [
+    {
+      "id": "demo_patient_001",
+      "name": "Patient A",
+      "geburtsdatum": "1955-03-15",
+      "station": "Chirurgie 3A",
+      "wundlokalisation": "Unterschenkel rechts, lateral",
+      "aetiologie": "venoes",
+      "anamnese": "CVI seit 12 Jahren, rezidivierendes Ulcus cruris venosum, Kompressionstherapie",
+      "assessments": [
+        {
+          "id": "assess_001a",
+          "datum": "01.03.2026, 09:30",
+          "notizen": "Erstassessment bei Aufnahme",
+          "ergebnis": {
+            "wundphase": "Exsudationsphase",
+            "gewebetypen": {
+              "granulation": 20,
+              "epithelgewebe": 5,
+              "fibrin": 50,
+              "nekrose": 15,
+              "sonstiges": 10
+            },
+            "exsudat": {
+              "menge": "stark",
+              "art": "serosanguinolent",
+              "farbe": "Gelblich-rötlich",
+              "geruch": "gering"
+            },
+            "wundrand": {
+              "zustand": "mazeriert",
+              "beschreibung": "Mazeration durch starkes Exsudat, Wundrand aufgeweicht und weißlich verfärbt"
+            },
+            "wundumgebung": {
+              "zustand": "ekzematös",
+              "beschreibung": "Stauungsekzem periulzerös, trockene schuppige Haut, livide Verfärbung"
+            },
+            "infektionszeichen": {
+              "vorhanden": false,
+              "zeichen": [],
+              "schweregrad": "keine",
+              "biofilm_verdacht": false
+            },
+            "groessenschaetzung": {
+              "laenge_cm": 5.8,
+              "breite_cm": 3.2,
+              "tiefe_cm": 0.4,
+              "flaeche_cm2": 18.56,
+              "referenzobjekt_erkannt": true,
+              "referenzobjekt": "1-Euro-Münze"
+            },
+            "dfs_klassifikation": {
+              "verdacht_auf_dfs": false,
+              "wagner_grad": null,
+              "armstrong_stadium": null,
+              "fusstyp": null,
+              "hinweise": null
+            },
+            "schmerz": {
+              "pieks_test_empfehlung": false,
+              "hinweis": "Schmerzassessment bei Verbandwechsel empfohlen (VAS 0-10)"
+            },
+            "verbandempfehlung": {
+              "primaerverband": "Nu-Derm Alginate (starkes Exsudat, Tamponade bei tiefer Wunde)",
+              "sekundaerverband": "Respo Sorb Super (Superabsorber als Sekundärverband)",
+              "wundspuelung": "Actimaris sensitiv (Reinigung, Biofilm-Prävention)",
+              "wechselintervall": "Täglich bis alle 2 Tage (aufgrund starken Exsudats)"
+            },
+            "ueberweisungskriterien": {
+              "ueberweisung_empfohlen": false,
+              "gruende": [],
+              "dringlichkeit": "keine"
+            },
+            "empfehlungen": [
+              "Wundspülung mit Actimaris sensitiv bei jedem Verbandwechsel",
+              "Exsudatmanagement priorisieren: Alginate + Superabsorber",
+              "Kompressionstherapie nach ärztlicher Anordnung (Grunderkrankung CVI)",
+              "Umgebungshaut schützen: Hautschutzcreme an mazeriertem Wundrand",
+              "Evaluation gemäß 14-Tage-Regel"
+            ],
+            "naechste_evaluation": "In 14 Tagen (15.03.2026)",
+            "zusammenfassung": "ABCD-Beurteilung: Ulcus cruris venosum am rechten Unterschenkel in der Exsudationsphase. Wundgrund überwiegend fibrinös belegt (50%), starkes serosanguinolentes Exsudat. Wundrand mazeriert. Keine Infektionszeichen (NERDS negativ). CVI als Grunderkrankung. Empfehlung: Exsudatmanagement und Wundreinigung intensivieren."
+          }
+        },
+        {
+          "id": "assess_001b",
+          "datum": "15.03.2026, 10:15",
+          "notizen": "14-Tage-Evaluation, Besserung erkennbar",
+          "ergebnis": {
+            "wundphase": "Granulationsphase",
+            "gewebetypen": {
+              "granulation": 55,
+              "epithelgewebe": 10,
+              "fibrin": 25,
+              "nekrose": 5,
+              "sonstiges": 5
+            },
+            "exsudat": {
+              "menge": "mäßig",
+              "art": "serös",
+              "farbe": "Klar-gelblich",
+              "geruch": "keiner"
+            },
+            "wundrand": {
+              "zustand": "gerötet",
+              "beschreibung": "Mazeration deutlich rückläufig, Wundrand leicht gerötet aber intakt"
+            },
+            "wundumgebung": {
+              "zustand": "intakt",
+              "beschreibung": "Stauungsekzem rückläufig, Umgebungshaut verbessert durch konsequente Pflege"
+            },
+            "infektionszeichen": {
+              "vorhanden": false,
+              "zeichen": [],
+              "schweregrad": "keine",
+              "biofilm_verdacht": false
+            },
+            "groessenschaetzung": {
+              "laenge_cm": 4.8,
+              "breite_cm": 2.6,
+              "tiefe_cm": 0.2,
+              "flaeche_cm2": 12.48,
+              "referenzobjekt_erkannt": true,
+              "referenzobjekt": "1-Euro-Münze"
+            },
+            "dfs_klassifikation": {
+              "verdacht_auf_dfs": false,
+              "wagner_grad": null,
+              "armstrong_stadium": null,
+              "fusstyp": null,
+              "hinweise": null
+            },
+            "schmerz": {
+              "pieks_test_empfehlung": false,
+              "hinweis": "VAS 2/10 bei Verbandwechsel"
+            },
+            "verbandempfehlung": {
+              "primaerverband": "Mepilex Transfer (mäßiges Exsudat, Granulationsphase)",
+              "sekundaerverband": "Xtrata Fixierfolie",
+              "wundspuelung": "Actimaris sensitiv",
+              "wechselintervall": "Alle 2-3 Tage"
+            },
+            "ueberweisungskriterien": {
+              "ueberweisung_empfohlen": false,
+              "gruende": [],
+              "dringlichkeit": "keine"
+            },
+            "empfehlungen": [
+              "Wundspülung mit Actimaris sensitiv fortführen",
+              "Umstellung auf Mepilex Transfer (Granulationsphase, mäßiges Exsudat)",
+              "Kompressionstherapie konsequent fortführen",
+              "Positive Heilungstendenz: Fläche um 33% reduziert",
+              "Nächste Evaluation in 14 Tagen"
+            ],
+            "naechste_evaluation": "In 14 Tagen (29.03.2026)",
+            "zusammenfassung": "14-Tage-Evaluation: Deutliche Besserung. Übergang in Granulationsphase (55% Granulation). Wundfläche um 33% reduziert (18,56 → 12,48 cm²). Exsudat rückläufig. Mazeration abklingend. Therapie angepasst: Umstellung auf Mepilex Transfer. Kompressionstherapie fortführen."
+          }
+        }
+      ]
+    },
+    {
+      "id": "demo_patient_002",
+      "name": "Patient B",
+      "geburtsdatum": "1948-11-22",
+      "station": "Interne 2B",
+      "wundlokalisation": "Fußsohle links, Metatarsalköpfchen I",
+      "aetiologie": "diabetisch",
+      "anamnese": "DM Typ 2 seit 20 Jahren, HbA1c 8.2%, PNP bekannt, Z.n. Amputation D5 rechts",
+      "assessments": [
+        {
+          "id": "assess_002a",
+          "datum": "10.03.2026, 14:00",
+          "notizen": "DFS-Erstbeurteilung, Überweisung an Wundambulanz empfohlen",
+          "ergebnis": {
+            "wundphase": "Gemischte Phase",
+            "gewebetypen": {
+              "granulation": 30,
+              "epithelgewebe": 5,
+              "fibrin": 40,
+              "nekrose": 20,
+              "sonstiges": 5
+            },
+            "exsudat": {
+              "menge": "mäßig",
+              "art": "purulent",
+              "farbe": "Gelblich-trüb",
+              "geruch": "stark"
+            },
+            "wundrand": {
+              "zustand": "hyperkeratotisch",
+              "beschreibung": "Hyperkeratose periulzerös, typisch für neuropathisches Ulkus. Wundrand verdickt, Schwielenbildung."
+            },
+            "wundumgebung": {
+              "zustand": "gerötet",
+              "beschreibung": "Umgebungserythem >2cm, warme Haut, Verdacht auf Spreading"
+            },
+            "infektionszeichen": {
+              "vorhanden": true,
+              "zeichen": ["Smell (fötider Geruch)", "Exudate (purulentes Exsudat)", "Red/friable granulation", "Erythema >2cm (STONEES)", "Temperature erhöht (STONEES)"],
+              "schweregrad": "systemisch_STONEES",
+              "biofilm_verdacht": true
+            },
+            "groessenschaetzung": {
+              "laenge_cm": 3.0,
+              "breite_cm": 2.5,
+              "tiefe_cm": 0.8,
+              "flaeche_cm2": 7.5,
+              "referenzobjekt_erkannt": true,
+              "referenzobjekt": "2-Euro-Münze"
+            },
+            "dfs_klassifikation": {
+              "verdacht_auf_dfs": true,
+              "wagner_grad": 2,
+              "armstrong_stadium": "D",
+              "fusstyp": "neuropathisch",
+              "hinweise": "Tiefes Ulkus am Metatarsalköpfchen I, typische Lokalisation für neuropathisches DFS. Sondierung zeigt Kontakt zu tieferen Strukturen. Zeichen einer kombinierten Infektion und Ischämie."
+            },
+            "schmerz": {
+              "pieks_test_empfehlung": true,
+              "hinweis": "Patient gibt VAS 1/10 an — CAVE: Bei PNP ist die Schmerzwahrnehmung reduziert! Objektive Befunde deuten auf höheren Schweregrad hin."
+            },
+            "verbandempfehlung": {
+              "primaerverband": "Aquacel Ag+ (infizierte Wunde, antimikrobiell, Exsudatmanagement)",
+              "sekundaerverband": "Mepilex Border (Polsterung, Druckschutz)",
+              "wundspuelung": "Actimaris sensitiv (Biofilm-Management, Reinigung)",
+              "wechselintervall": "Täglich (aufgrund Infektionszeichen)"
+            },
+            "ueberweisungskriterien": {
+              "ueberweisung_empfohlen": true,
+              "gruende": [
+                "DFS Wagner Grad 2 mit Armstrong D (Infektion + Ischämie)",
+                "Systemische Infektionszeichen (STONEES-Kriterien positiv)",
+                "Biofilm-Verdacht",
+                "Purulentes Exsudat mit starkem Geruch"
+              ],
+              "dringlichkeit": "dringend"
+            },
+            "empfehlungen": [
+              "DRINGENDE Überweisung an Wundambulanz / Diabetische Fußambulanz",
+              "Abstrichentnahme für mikrobiologische Diagnostik",
+              "Labordiagnostik: CRP, Leukos, HbA1c, BZ-Tagesprofil",
+              "Wundspülung mit Actimaris sensitiv, antimikrobieller Verband Aquacel Ag+",
+              "Druckentlastung: Vorfußentlastungsschuh oder Total Contact Cast erwägen",
+              "Ischämie abklären: ABI, ggf. Duplexsonographie",
+              "Blutzuckereinstellung optimieren (aktuell HbA1c 8.2%)",
+              "Fachärztliche Beurteilung bzgl. chirurgischem Debridement"
+            ],
+            "naechste_evaluation": "In 3-5 Tagen (aufgrund Infektionszeichen, verkürzt)",
+            "zusammenfassung": "ABCD-Beurteilung: Diabetisches Fußsyndrom, neuropathisches Ulkus am Metatarsalköpfchen I links. Wagner Grad 2, Armstrong D (Infektion + Ischämie). STONEES-Kriterien positiv (V.a. systemische Infektionsausbreitung). Biofilm-Verdacht. Dringende Überweisung an Wundambulanz. Interdisziplinäre Behandlung erforderlich (Diabetologie, Gefäßchirurgie, Wundmanagement)."
+          }
+        }
+      ]
+    }
+  ]
+}
