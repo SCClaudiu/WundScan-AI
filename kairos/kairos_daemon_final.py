@@ -87,7 +87,7 @@ def append_log(message: str) -> None:
     line = f"[{timestamp}] {message}"
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(line + "\n")
-    print(line)
+    print(line.encode("ascii", errors="replace").decode("ascii"))
 
 
 def load_json_file(path: Path, default: Any) -> Any:
