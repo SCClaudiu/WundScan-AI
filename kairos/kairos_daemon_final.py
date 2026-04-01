@@ -216,6 +216,49 @@ def query_relevant_observations(query_text: str, n_results: int = 20) -> List[st
         return []
 
 
+# ============== SEED LOADER ==============
+SEED_FILE = _SCRIPT_DIR / "WundScan-AI_seed.md"
+SEED_MARKER_ID = "seed_loaded_marker"
+
+
+def load_seed_if_needed() -> None:
+    """Laedt die Seed-Datei in ChromaDB, falls noch nicht geschehen."""
+    try:
+        existing = collection.get(ids=[SEED_MARKER_ID])
+        if existing and existing.get("ids"):
+            return  # Seed bereits geladen
+    except Exception:
+        pass  # Marker existiert nicht, also laden
+
+    if not SEED_FILE.exists():
+        append_log(f"Seed-Datei nicht gefunden: {SEED_FILE.name}")
+        return
+
+    try:
+        content = SEED_FILE.read_text(encoding="utf-8")
+        # Splitte nach Markdown-Sektionen
+        sections = re.split(r'\n(?=## )', content)
+        chunks = [s.strip() for s in sections if s.strip() and len(s.strip()) > 20]
+
+        if not chunks:
+            append_log("Seed-Datei leer oder nicht parsebar.")
+            return
+
+        ids = [f"seed_{i}" for i in range(len(chunks))]
+        metadatas = [{"source": "seed", "timestamp": utc_now_iso()} for _ in chunks]
+        collection.add(documents=chunks, metadatas=metadatas, ids=ids)
+
+        # Marker setzen damit Seed nicht doppelt geladen wird
+        collection.add(
+            documents=["Seed geladen"],
+            metadatas=[{"source": "marker", "timestamp": utc_now_iso()}],
+            ids=[SEED_MARKER_ID],
+        )
+        append_log(f"Seed geladen: {len(chunks)} Sektionen aus {SEED_FILE.name}")
+    except Exception as e:
+        append_log(f"Seed-Loader Fehler: {e}")
+
+
 # ============== AI HELPERS ==============
 def anthropic_text(prompt: str, max_tokens: int = 800, temperature: float = 0.2) -> str:
     try:
@@ -238,21 +281,17 @@ def perform_autodream(memory: Dict[str, Any]) -> bool:
     relevant_obs = query_relevant_observations(
         memory.get("consolidated", "Projekt Kontext") or "Projekt Kontext"
     )
-    dream_prompt = f"""Du bist Kairos und fuehrst autoDream durch.
+    dream_prompt = f"""Fasse den aktuellen Stand des WundScan-AI Projekts zusammen.
 
-Aktuelles Wissen:
-{memory.get("consolidated", "Noch leer")}
+Beobachtungen aus dem Monitoring:
+{" | ".join(relevant_obs[:10]) if relevant_obs else "Keine Beobachtungen."}
 
-Relevante Beobachtungen:
-{" | ".join(relevant_obs[:15]) if relevant_obs else "Keine Beobachtungen vorhanden."}
-
-Erstelle eine klare, verdichtete Zusammenfassung von:
-1. Aktueller Projektzustand
-2. Offenen Problemen / Technischen Schulden
-3. Naechsten sinnvollen Schritten
-4. Wichtigen Risiken oder Blockern
-
-Antworte kompakt und umsetzungsorientiert."""
+Regeln:
+- Nur ASCII-Zeichen verwenden
+- Maximal 10 Saetze
+- Ignoriere fruehere Meldungen ueber "Deadlock" oder "knowledge_base.json" - das ist geloest
+- Fokus auf: Was ist WundScan-AI, welcher Stack, was sind die naechsten Schritte
+- Keine Empfehlungen zum Daemon selbst"""
 
     try:
         memory["consolidated"] = anthropic_text(dream_prompt, max_tokens=600, temperature=0.3)
@@ -368,46 +407,51 @@ def tick() -> None:
     github_updates = check_github_updates()
     github_context = "\n".join(github_updates) if github_updates else "Keine neuen GitHub-Aktivitaeten."
 
-    prompt = f"""Du bist Kairos, ein autonomer, proaktiver Daemon.
+    prompt = f"""Du bist Kairos, Beobachter-Daemon fuer WundScan-AI (klinisches Wunddokumentations-Tool).
 
-Konsolidiertes Wissen:
-{memory.get('consolidated', 'Noch leer')}
-
-Lokaler Git-Status:
+GIT-STATUS:
 {git_status}
 
-GitHub-Updates:
+GITHUB-UPDATES:
 {github_context}
 
-Antworte kurz im Format:
-AKTION: [kurze Beschreibung]
-oder
-RUHE: [kurzer Grund]
+REGELN:
+- Du bist NUR Beobachter. Du kannst nichts ausfuehren.
+- Melde NUR echte Aenderungen: neue Issues, neue PRs, grosse Git-Diffs.
+- Uncommitted Changes sind NORMAL bei aktiver Entwicklung - nicht melden.
+- Erwaehne NIEMALS "Deadlock", "knowledge_base.json" oder interne Daemon-Probleme.
+- Nur ASCII-Zeichen.
 
-Sei sparsam und wertvoll."""
+ANTWORT-FORMAT (waehle genau eins):
+BERICHT: [Was hat sich konkret geaendert seit dem letzten Tick]
+EMPFEHLUNG: [Konkreter Vorschlag zum WundScan-AI Projekt]
+RUHE: Keine relevanten Aenderungen.
+
+Maximal 2 Saetze."""
 
     try:
         action_text = anthropic_text(prompt, max_tokens=400, temperature=0.5)
         append_log(action_text)
 
         # Speichere Observation
+        is_noteworthy = "EMPFEHLUNG" in action_text.upper() or "BERICHT" in action_text.upper()
         metadata = {
             "timestamp": utc_now_iso(),
             "github_updates": len(github_updates),
-            "has_action": "AKTION" in action_text.upper(),
+            "has_action": is_noteworthy,
         }
         add_observation_to_vectorstore(action_text, metadata)
 
-        # autoDream
+        # autoDream alle 6 Beobachtungen
         if collection.count() % 6 == 0 and collection.count() > 0:
             perform_autodream(memory)
 
-        # Benachrichtigung
-        if "AKTION:" in action_text.upper() or not NOTIFY_ONLY_ON_ACTION:
+        # Benachrichtigung nur bei Empfehlungen/Berichten
+        if is_noteworthy or not NOTIFY_ONLY_ON_ACTION:
             send_notification(action_text)
 
         # Refactoring pruefen
-        if "AKTION:" in action_text.upper() and any(
+        if is_noteworthy and any(
             kw in action_text.lower()
             for kw in ["refactor", "refactoring", "verbesser", "clean", "umstruktur"]
         ):
@@ -419,6 +463,7 @@ Sei sparsam und wertvoll."""
 
 # ============== START ==============
 def run_kairos_daemon():
+    load_seed_if_needed()  # Wissensbasis laden
     schedule.every(TICK_INTERVAL_MIN).minutes.do(tick)
     append_log(
         f"Kairos-Daemon FINAL gestartet! Tick-Intervall: {TICK_INTERVAL_MIN} Minuten | Projekt: {PROJECT_DIR}"

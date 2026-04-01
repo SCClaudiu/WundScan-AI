@@ -17,7 +17,13 @@
       "Bash(python -c \"import anthropic; import schedule; import chromadb; from github import Github; print\\(''Alle Imports OK''\\)\")",
       "Bash(python -c \"from pathlib import Path; from dotenv import load_dotenv; import os; load_dotenv\\(Path\\(''.env''\\)\\); print\\(''KEY:'', repr\\(os.getenv\\(''ANTHROPIC_API_KEY'',''MISSING''\\)[:20]\\)\\)\")",
       "Bash(./kairos stop:*)",
-      "Bash(rm -f kairos_logs.txt)"
+      "Bash(rm -f kairos_logs.txt)",
+      "Read(//c/Users/droni/Desktop/**)",
+      "Bash(unzip -o files.zip -d files_extracted)",
+      "Bash(tasklist)",
+      "Bash(tasklist.exe)",
+      "Bash(cp \"C:/Users/droni/Desktop/files_extracted/kairos_daemon_final.py\" \"C:/Users/droni/Desktop/WundScan-AI/kairos/kairos_daemon_final.py\")",
+      "Bash(cp \"C:/Users/droni/Desktop/files_extracted/kairos_memory.json\" \"C:/Users/droni/Desktop/WundScan-AI/kairos/kairos_memory.json\")"
     ]
   }
 }
