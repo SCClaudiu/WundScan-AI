@@ -1,50 +1,45 @@
 """WundScan-AI CLI entry point.
 
 NOT A MEDICAL DEVICE. Decision-support / documentation only.
-All outputs require qualified-clinician review before clinical action.
+All outputs require qualified-clinician review before any clinical action.
 
-Usage:
-    uv run python agent.py <image_path> [patient_id] [notes...]
+Modern usage (typer):
+    uv run python agent.py init
+    uv run python agent.py assess <image> <patient_id> [--notes "..."]
+    uv run python agent.py timeline <patient_id>
+    uv run python agent.py show <visit_id>
+    uv run python agent.py export <patient_id> [--out path.md]
 
-Examples:
-    uv run python agent.py /tmp/test.jpg patient_001 "left heel pressure ulcer, day 7"
+Legacy positional form (kept for muscle memory):
+    uv run python agent.py <image> <patient_id> [notes...]
 """
 from __future__ import annotations
 
-import json
-import logging
 import sys
 from pathlib import Path
 
-from wundscan.pipeline import assess
+from wundscan.cli import main
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
-)
+KNOWN_COMMANDS = {"init", "assess", "timeline", "show", "export", "--help", "-h"}
 
 
-def main() -> int:
+def _legacy_dispatch() -> None:
+    """Translate legacy `agent.py <image> <patient> notes...` into typer form."""
     if len(sys.argv) < 2:
-        print(__doc__)
-        return 1
-
-    image = Path(sys.argv[1])
-    patient = sys.argv[2] if len(sys.argv) > 2 else "anon"
-    notes = " ".join(sys.argv[3:]) if len(sys.argv) > 3 else ""
-
-    result = assess(image, patient_id=patient, notes=notes)
-
-    print(f"\n[+] report:        {result['report']}")
-    print(f"[+] stored image:  {result['stored_image']}")
-    print(f"[+] perception:    {result['vlm_used']}")
-    print(f"[+] embedding dim: {result['embedding_dim']}\n")
-    print("=== Visual assessment ===")
-    print(json.dumps(result["assessment"], indent=2))
-    print("\n=== Clinical reasoning ===")
-    print(json.dumps(result["reasoning"], indent=2))
-    return 0
+        return
+    first = sys.argv[1]
+    if first in KNOWN_COMMANDS or first.startswith("-"):
+        return
+    if not Path(first).exists() or len(sys.argv) < 3:
+        return
+    image, patient_id = sys.argv[1], sys.argv[2]
+    notes = " ".join(sys.argv[3:])
+    new_argv = [sys.argv[0], "assess", image, patient_id]
+    if notes:
+        new_argv += ["--notes", notes]
+    sys.argv = new_argv
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    _legacy_dispatch()
+    main()
